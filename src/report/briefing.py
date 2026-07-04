@@ -11,7 +11,8 @@ from src.models.regime import market_regime
 
 
 def daily_briefing(watchlist: list[str] | None = None) -> str:
-    tickers = watchlist or TAPE_TICKERS[:8]
+    from src.data.store import watchlist as _my_list
+    tickers = watchlist or _my_list() or TAPE_TICKERS[:8]
     reg = market_regime()
     df = get_quotes(tickers).sort_values("change_pct")
     worst, best = df.iloc[0], df.iloc[-1]

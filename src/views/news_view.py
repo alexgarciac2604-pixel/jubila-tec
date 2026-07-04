@@ -13,8 +13,12 @@ def render() -> None:
     st.title("📰 Noticias & Sentimiento")
     source_caption()
 
-    tickers = st.multiselect("Tickers a seguir", TAPE_TICKERS,
-                             default=["AAPL", "MSFT", "NVDA", "TSLA"])
+    from src.data.store import watchlist as _my_list
+    from src.config import DEFAULT_UNIVERSE
+    wl = _my_list()
+    options = list(dict.fromkeys(DEFAULT_UNIVERSE + TAPE_TICKERS + wl))
+    default = [t for t in (wl or ["AAPL", "MSFT", "NVDA", "TSLA"]) if t in options][:8]
+    tickers = st.multiselect("Tickers a seguir", options, default=default)
     tone = st.radio("Filtro", ["Todas", "🟢 positivas", "🔴 negativas"], horizontal=True)
 
     items = []

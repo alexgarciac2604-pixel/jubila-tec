@@ -30,6 +30,12 @@ def render(ticker: str) -> None:
         f"<span class='jt-badge'>{a['regime']['emoji']} {a['regime']['name']}</span>",
         unsafe_allow_html=True,
     )
+    from src.data.store import watchlist, watchlist_add, watchlist_remove
+    in_wl = a["ticker"] in watchlist()
+    if st.button("💔 Quitar de Mi Lista" if in_wl else "⭐ Agregar a Mi Lista"):
+        (watchlist_remove if in_wl else watchlist_add)(a["ticker"])
+        st.rerun()
+
     if dq["issues"]:
         st.warning("Calidad de datos: " + " · ".join(dq["issues"]))
     source_caption()
@@ -85,6 +91,15 @@ def render(ticker: str) -> None:
         c1.metric("P/E", fmt_num(m["pe"]))
         c2.metric("EV/EBIT", fmt_num(m["ev_ebit"]))
         c3.metric("Conversión de caja", fmt_num(m["fcf_conversion"]))
+        st.markdown("**Comparación con pares del sector**")
+        from src.fundamental.metrics import peer_comparison
+        pares = peer_comparison(a["ticker"])
+        if len(pares) > 1:
+            st.dataframe(
+                pares.style.format({"P/E": "{:.1f}", "ROIC %": "{:.1f}",
+                                    "Margen neto %": "{:.1f}", "Momentum 6m %": "{:+.1f}"}),
+                hide_index=True, use_container_width=True,
+            )
 
     with tabs[1]:
         v = a["valuation"]

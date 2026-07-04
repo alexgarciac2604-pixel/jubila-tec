@@ -304,6 +304,26 @@ def test_daily_update_job():
     assert lookup_ticker("AAPL") is False       # offline → False, sin explotar
 
 
+def test_v08_watchlist_peers():
+    from src.data import store
+    for x in store.watchlist():
+        store.watchlist_remove(x)               # estado limpio
+    store.watchlist_add("AAPL")
+    store.watchlist_add("MSFT")
+    store.watchlist_add("aapl")                 # duplicado (case-insensitive) ignorado
+    assert store.watchlist() == ["AAPL", "MSFT"]
+    from src.report.briefing import daily_briefing
+    b = daily_briefing()                        # sin argumento → usa Mi Lista
+    assert "AAPL" in b or "MSFT" in b
+    store.watchlist_remove("AAPL")
+    assert store.watchlist() == ["MSFT"]
+    store.watchlist_remove("MSFT")
+    from src.fundamental.metrics import peer_comparison
+    df = peer_comparison("AAPL")
+    assert len(df) >= 2 and df.iloc[0]["Ticker"].startswith("⭐")
+    assert "P/E" in df.columns and "Calidad" in df.columns
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

@@ -26,6 +26,7 @@ def _conn() -> sqlite3.Connection:
         ticker TEXT, date TEXT, total INTEGER, pillars TEXT,
         price REAL, version TEXT, source TEXT,
         PRIMARY KEY (ticker, date))""")
+    con.execute("CREATE TABLE IF NOT EXISTS watchlist (ticker TEXT PRIMARY KEY, added TEXT)")
     return con
 
 
@@ -52,3 +53,30 @@ def score_history(ticker: str, limit: int = 90) -> list[dict]:
         return [{"date": d, "total": t, "price": p} for d, t, p in reversed(rows)]
     except Exception:
         return []
+
+
+def watchlist() -> list[str]:
+    """Tickers de Mi Lista (orden de agregado)."""
+    try:
+        with _conn() as con:
+            rows = con.execute("SELECT ticker FROM watchlist ORDER BY added, ticker").fetchall()
+        return [r[0] for r in rows]
+    except Exception:
+        return []
+
+
+def watchlist_add(ticker: str) -> None:
+    try:
+        with _conn() as con:
+            con.execute("INSERT OR IGNORE INTO watchlist VALUES (?, ?)",
+                        (ticker.upper(), str(date.today())))
+    except Exception:
+        pass
+
+
+def watchlist_remove(ticker: str) -> None:
+    try:
+        with _conn() as con:
+            con.execute("DELETE FROM watchlist WHERE ticker=?", (ticker.upper(),))
+    except Exception:
+        pass

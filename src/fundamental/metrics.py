@@ -61,3 +61,31 @@ def analyze(f: dict) -> dict:
         "ev_ebit": _safe_div((f.get("market_cap") or 0) + (debt or 0) - (cash or 0), ebit),
         "earnings_yield": _safe_div(ni, f.get("market_cap")),
     }
+
+
+def peer_comparison(ticker: str, max_peers: int = 5):
+    """Tabla ticker vs. pares del sector: P/E, ROIC, margen, calidad, momentum 6m."""
+    import pandas as pd
+    from src.config import SECTOR_OF
+    from src.data.market_data import get_fundamentals, get_history
+
+    t0 = ticker.upper()
+    sector = SECTOR_OF.get(t0)
+    peers = [t for t, s in SECTOR_OF.items() if s == sector and t != t0][:max_peers]
+    rows = []
+    for t in [t0] + peers:
+        try:
+            fm = analyze(get_fundamentals(t))
+            close = get_history(t).Close
+            mom6 = (float(close.iloc[-1] / close.iloc[-126]) - 1) * 100 if len(close) > 126 else 0.0
+            rows.append({
+                "Ticker": ("⭐ " if t == t0 else "") + t,
+                "P/E": fm["pe"],
+                "ROIC %": (fm["roic"] or 0) * 100,
+                "Margen neto %": (fm["net_margin"] or 0) * 100,
+                "Calidad": fm["quality_score"],
+                "Momentum 6m %": mom6,
+            })
+        except Exception:
+            continue
+    return pd.DataFrame(rows)

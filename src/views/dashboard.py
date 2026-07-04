@@ -51,6 +51,15 @@ def render() -> None:
                f"(GMM 2 estados sobre {reg['bench']}). En turbulencia, el score reduce el peso "
                "del momentum y sube calidad/forense.")
 
+    from src.data.store import watchlist as _my_list
+    wl = _my_list()
+    if wl:
+        st.subheader("⭐ Mi Lista")
+        wdf = get_quotes(wl)[["ticker", "name", "price", "change_pct"]]
+        wdf.columns = ["Ticker", "Nombre", "Precio", "% Día"]
+        st.dataframe(wdf.style.format({"Precio": "${:.2f}", "% Día": "{:+.2f}%"}),
+                     hide_index=True, use_container_width=True)
+
     st.subheader("🗺️ Heatmap sectorial")
     df = get_quotes(DEFAULT_UNIVERSE)
     fig = px.treemap(

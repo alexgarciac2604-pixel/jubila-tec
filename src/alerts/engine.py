@@ -9,6 +9,7 @@ import os
 import sqlite3
 from datetime import date
 
+from src.config import get_secret
 from src.data.store import _db_path
 
 KINDS = {
@@ -80,7 +81,7 @@ def evaluate_alerts() -> list[dict]:
 
 
 def telegram_configured() -> bool:
-    return bool(os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID"))
+    return bool(get_secret("TELEGRAM_BOT_TOKEN") and get_secret("TELEGRAM_CHAT_ID"))
 
 
 def send_telegram(text: str) -> bool:
@@ -89,8 +90,8 @@ def send_telegram(text: str) -> bool:
     try:
         import requests
         r = requests.post(
-            f"https://api.telegram.org/bot{os.getenv('TELEGRAM_BOT_TOKEN')}/sendMessage",
-            json={"chat_id": os.getenv("TELEGRAM_CHAT_ID"), "text": text},
+            f"https://api.telegram.org/bot{get_secret('TELEGRAM_BOT_TOKEN')}/sendMessage",
+            json={"chat_id": get_secret("TELEGRAM_CHAT_ID"), "text": text},
             timeout=8,
         )
         return r.status_code == 200

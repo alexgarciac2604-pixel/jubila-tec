@@ -13,7 +13,7 @@ import os
 import re
 import unicodedata
 
-from src.config import TICKER_NAMES
+from src.config import TICKER_NAMES, get_secret
 
 _SYSTEM = (
     "Eres el copiloto de Jubila-Tec, una terminal financiera educativa. "
@@ -233,7 +233,7 @@ def _rule_based(intent: dict, context: str) -> str:
 
 
 def llm_available() -> bool:
-    return bool(os.getenv("ANTHROPIC_API_KEY"))
+    return bool(get_secret("ANTHROPIC_API_KEY"))
 
 
 def answer(question: str) -> dict:
@@ -243,7 +243,7 @@ def answer(question: str) -> dict:
         if lookup_ticker(intent["token"]):      # cotiza aunque no esté en mi lista
             intent = {"kind": "ticker", "ticker": intent["token"]}
     context = build_context(intent)
-    key = os.getenv("ANTHROPIC_API_KEY")
+    key = get_secret("ANTHROPIC_API_KEY")
     if key and context:
         text = _ask_llm(question, context, key)
         if text:

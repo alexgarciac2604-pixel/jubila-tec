@@ -11,6 +11,22 @@ try:  # .env opcional
 except Exception:
     pass
 
+def get_secret(name: str) -> str:
+    """Lee una clave de entorno o de st.secrets (Streamlit Cloud).
+
+    En la nube, los secrets viven en st.secrets y no siempre llegan como
+    variables de entorno; localmente vienen del .env. Este helper cubre ambos.
+    """
+    v = os.getenv(name, "")
+    if v:
+        return v
+    try:
+        import streamlit as st
+        return str(st.secrets.get(name, "") or "")
+    except Exception:
+        return ""
+
+
 DISCLAIMER = (
     "⚠️ Jubila-Tec ofrece análisis informativo y educativo con datos públicos. "
     "No es asesoría financiera personalizada ni garantiza rendimientos. "
@@ -64,7 +80,7 @@ class Settings:
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings(
-        newsapi_key=os.getenv("NEWSAPI_KEY", ""),
-        fred_api_key=os.getenv("FRED_API_KEY", ""),
+        newsapi_key=get_secret("NEWSAPI_KEY"),
+        fred_api_key=get_secret("FRED_API_KEY"),
         force_sample=os.getenv("JT_FORCE_SAMPLE", "0") == "1",
     )

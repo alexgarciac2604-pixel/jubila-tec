@@ -1,0 +1,14 @@
+# ============================================================
+# Jubila-Tec Terminal — MVP dependencies (Python 3.10+)
+# ============================================================
+streamlit>=1.40
+yfinance>=0.2.50
+pandas>=2.1
+numpy>=1.26
+plotly>=5.22
+scipy>=1.11
+scikit-learn>=1.4
+matplotlib>=3.8
+openpyxl>=3.1
+requests>=2.31
+python-dotenv>=1.0

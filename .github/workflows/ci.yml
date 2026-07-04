@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias del núcleo
+        run: pip install numpy pandas scipy scikit-learn
+      - name: Smoke tests (modo offline determinista)
+        env:
+          JT_FORCE_SAMPLE: "1"
+          JT_DB_PATH: /tmp/jt_ci.db
+        run: python tests/test_smoke.py
+      - name: Compilación completa (incluye vistas)
+        run: |
+          pip install streamlit plotly
+          python -m py_compile app.py $(find src tests jobs -name "*.py")

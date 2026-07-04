@@ -1,4 +1,4 @@
-"""Feed de noticias: yfinance si hay red, sintético determinista si no."""
+"""Feed de noticias con failover: NewsAPI → yfinance → sintético determinista."""
 from __future__ import annotations
 
 from src.data import sample_data as sd
@@ -14,10 +14,40 @@ except Exception:
     _HAS_YF = False
 
 
+def _newsapi_items(ticker: str, n: int) -> list[dict]:
+    """Noticias reales de NewsAPI (requiere NEWSAPI_KEY). [] si falla."""
+    from src.config import TICKER_NAMES, get_secret
+    key = get_secret("NEWSAPI_KEY")
+    if not key:
+        return []
+    try:
+        import requests
+        name = TICKER_NAMES.get(ticker.upper(), ticker)
+        r = requests.get(
+            "https://newsapi.org/v2/everything",
+            params={"q": f'"{name}"', "sortBy": "publishedAt",
+                    "pageSize": n, "language": "en", "apiKey": key},
+            timeout=8,
+        )
+        if r.status_code != 200:
+            return []
+        return [{
+            "title": a.get("title", ""),
+            "publisher": (a.get("source") or {}).get("name", ""),
+            "link": a.get("url", ""),
+            "date": str(a.get("publishedAt", ""))[:10],
+        } for a in r.json().get("articles", []) if a.get("title")]
+    except Exception:
+        return []
+
+
 @ttl_cache(ttl=900)
 def get_news(ticker: str, n: int = 8) -> list[dict]:
+    from src.config import get_settings
     items: list[dict] = []
-    if not using_sample() and _HAS_YF:
+    if not get_settings().force_sample:
+        items = _newsapi_items(ticker, n)          # 1º NewsAPI (si hay clave)
+    if not items and not using_sample() and _HAS_YF:
         try:
             raw = yf.Ticker(ticker).news or []
             for it in raw[:n]:

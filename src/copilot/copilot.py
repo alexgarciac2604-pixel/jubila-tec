@@ -25,18 +25,7 @@ _SYSTEM = (
 )
 
 # nombre común (minúsculas, sin acentos) → ticker
-_NAME_TO_TICKER = {
-    "apple": "AAPL", "spacex": "SPCX", "space x": "SPCX", "microsoft": "MSFT", "nvidia": "NVDA", "google": "GOOGL",
-    "alphabet": "GOOGL", "amazon": "AMZN", "facebook": "META", "meta platforms": "META",
-    "tesla": "TSLA", "broadcom": "AVGO", "jpmorgan": "JPM", "jp morgan": "JPM",
-    "bank of america": "BAC", "visa": "V", "mastercard": "MA",
-    "johnson": "JNJ", "pfizer": "PFE", "unitedhealth": "UNH", "eli lilly": "LLY",
-    "lilly": "LLY", "exxon": "XOM", "chevron": "CVX", "walmart": "WMT",
-    "procter": "PG", "coca cola": "KO", "coca-cola": "KO", "pepsi": "PEP",
-    "home depot": "HD", "mcdonalds": "MCD", "mcdonald": "MCD", "disney": "DIS",
-    "netflix": "NFLX", "caterpillar": "CAT", "boeing": "BA",
-    "general electric": "GE", "lockheed": "LMT", "at&t": "T", "verizon": "VZ",
-}
+from src.config import NAME_TO_TICKER as _NAME_TO_TICKER
 
 # empresas famosas que NO cotizan en bolsa (o no en NYSE/Nasdaq)
 _PRIVATE = {

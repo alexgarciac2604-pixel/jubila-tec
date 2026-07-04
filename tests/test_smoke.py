@@ -324,6 +324,37 @@ def test_v08_watchlist_peers():
     assert "P/E" in df.columns and "Calidad" in df.columns
 
 
+def test_v081_short_history_ipo():
+    """Una IPO con pocos días debe usar datos reales y avisar, no inventar historia."""
+    from src.data.market_data import get_history
+    from src.data.quality import assess
+    from src.technical.signals import technical_summary
+    from src.models.risk import risk_summary
+    h15 = get_history("AAPL").tail(15)              # simula IPO de 3 semanas
+    dq = assess(h15)
+    assert any("historial corto" in i for i in dq["issues"])
+    ts = technical_summary(h15)                      # los motores no deben explotar
+    assert 0 <= ts["score"] <= 100
+    r = risk_summary(h15.Close)
+    assert r["ann_vol"] > 0
+
+
+def test_v082_resolve_symbol():
+    """El buscador entiende nombres y typos; jamás resuelve a algo inventado."""
+    from src.data.market_data import resolve_symbol
+    assert resolve_symbol("TSLA") == "TSLA"
+    assert resolve_symbol("TESLA") == "TSLA"       # el bug reportado
+    assert resolve_symbol("tesla") == "TSLA"
+    assert resolve_symbol("apple") == "AAPL"
+    assert resolve_symbol("coca cola") == "KO"
+    assert resolve_symbol("APPLE") == "AAPL"
+    assert resolve_symbol("microsft") == "MSFT"    # typo cercano
+    assert resolve_symbol("") is None
+    assert resolve_symbol("XQZWV") is None          # sin red no se inventa nada
+    from src.copilot.copilot import detect_intent   # el copiloto sigue funcionando
+    assert detect_intent("¿qué te parece tesla?")["ticker"] == "TSLA"
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

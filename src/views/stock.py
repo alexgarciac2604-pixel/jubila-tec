@@ -13,6 +13,20 @@ from src.views.components import candles_figure, dark_fig, score_gauge, source_c
 
 
 def render(ticker: str) -> None:
+    from src.data.market_data import get_history, resolve_symbol, source_of, using_sample
+    get_history(ticker)                          # dispara el failover y fija la fuente
+    if source_of(ticker) == "sample" and not using_sample():
+        # Hay internet pero este símbolo no tiene datos reales: NUNCA inventar.
+        st.error(f"No encontré datos reales de mercado para **{ticker}**.")
+        sug = resolve_symbol(ticker)
+        if sug and sug != ticker.upper():
+            st.info(f"💡 ¿Quisiste decir **{sug}**? Escríbelo en el buscador de la "
+                    "barra lateral.")
+        else:
+            st.info("Verifica el símbolo exacto en 🗺️ Mercados, o prueba con el "
+                    "nombre de la empresa (ej. \"tesla\", \"coca cola\").")
+        return
+
     with st.status(f"Analizando {ticker}…", expanded=False):
         try:
             a = composite_score(ticker)

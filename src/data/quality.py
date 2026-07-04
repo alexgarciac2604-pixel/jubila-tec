@@ -10,7 +10,8 @@ def assess(df: pd.DataFrame) -> dict:
     issues: list[str] = []
     n = len(df)
     if n < 200:
-        issues.append(f"historial corto ({n} días)")
+        issues.append(f"historial corto ({n} días — ¿IPO reciente?); los indicadores "
+                      "de largo plazo (SMA200, momentum 12m, VaR) tienen poca base")
 
     # precios congelados (posible fuente rota)
     frozen = int((df.Close.diff() == 0).astype(int)

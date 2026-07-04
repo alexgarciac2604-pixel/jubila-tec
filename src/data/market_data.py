@@ -36,7 +36,9 @@ def get_history(ticker: str, period: str = "2y") -> pd.DataFrame:
         if _HAS_YF:
             try:
                 df = yf.Ticker(ticker).history(period=period, auto_adjust=True)
-                if df is not None and len(df) > 30:
+                # ≥5 días basta: una IPO reciente merece sus datos REALES,
+                # no 500 días sintéticos (bug detectado con SPCX, jun-2026)
+                if df is not None and len(df) >= 5:
                     _SOURCES[ticker.upper()] = "yfinance"
                     return df[["Open", "High", "Low", "Close", "Volume"]].dropna()
             except Exception:
@@ -127,3 +129,33 @@ def lookup_ticker(symbol: str) -> bool:
         return h is not None and len(h) > 0
     except Exception:
         return False
+
+
+def resolve_symbol(query: str) -> str | None:
+    """Resuelve lo que el usuario escribió a un ticker real.
+
+    Acepta el ticker (TSLA), el nombre (tesla, TESLA, coca cola) o un typo
+    cercano. Último recurso: pregunta al proveedor en vivo. None si no hay
+    forma honesta de resolverlo — mejor negarse que inventar (bug TESLA).
+    """
+    import difflib
+    import unicodedata
+    from src.config import NAME_TO_TICKER
+
+    q = (query or "").strip()
+    if not q:
+        return None
+    qu = q.upper()
+    if qu in TICKER_NAMES:
+        return qu
+    ql = unicodedata.normalize("NFD", q.lower()).encode("ascii", "ignore").decode()
+    if ql in NAME_TO_TICKER:
+        return NAME_TO_TICKER[ql]
+    close = difflib.get_close_matches(
+        ql, list(NAME_TO_TICKER) + [t.lower() for t in TICKER_NAMES], n=1, cutoff=0.8)
+    if close:
+        c = close[0]
+        return NAME_TO_TICKER.get(c, c.upper())
+    if lookup_ticker(qu):                # cotiza aunque no esté en el universo
+        return qu
+    return None

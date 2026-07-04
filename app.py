@@ -65,7 +65,8 @@ with st.sidebar:
                           label_visibility="collapsed",
                           placeholder="Ej. AAPL, NVDA, MSFT").upper().strip()
     if st.button("Analizar acción", use_container_width=True, type="primary"):
-        st.session_state["ticker"] = typed or "AAPL"
+        from src.data.market_data import resolve_symbol
+        st.session_state["ticker"] = resolve_symbol(typed) or typed or "AAPL"
         st.session_state["page"] = "🔍 Análisis de Acción"
         st.rerun()
 

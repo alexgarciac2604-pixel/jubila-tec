@@ -18,6 +18,6 @@ def get_history(ticker: str, days: int = 500) -> pd.DataFrame | None:
             return None
         df = pd.read_csv(io.StringIO(r.text), parse_dates=["Date"], index_col="Date")
         df = df[["Open", "High", "Low", "Close", "Volume"]].dropna().tail(days)
-        return df if len(df) > 30 else None
+        return df if len(df) >= 5 else None
     except Exception:
         return None

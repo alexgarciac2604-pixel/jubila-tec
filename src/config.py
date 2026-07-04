@@ -58,6 +58,21 @@ SECTOR_OF = {
     "SPCX": "Industrial",
 }
 
+# nombre común (minúsculas, sin acentos) → ticker
+NAME_TO_TICKER = {
+    "apple": "AAPL", "spacex": "SPCX", "space x": "SPCX", "microsoft": "MSFT", "nvidia": "NVDA", "google": "GOOGL",
+    "alphabet": "GOOGL", "amazon": "AMZN", "facebook": "META", "meta platforms": "META",
+    "tesla": "TSLA", "broadcom": "AVGO", "jpmorgan": "JPM", "jp morgan": "JPM",
+    "bank of america": "BAC", "visa": "V", "mastercard": "MA",
+    "johnson": "JNJ", "pfizer": "PFE", "unitedhealth": "UNH", "eli lilly": "LLY",
+    "lilly": "LLY", "exxon": "XOM", "chevron": "CVX", "walmart": "WMT",
+    "procter": "PG", "coca cola": "KO", "coca-cola": "KO", "pepsi": "PEP",
+    "home depot": "HD", "mcdonalds": "MCD", "mcdonald": "MCD", "disney": "DIS",
+    "netflix": "NFLX", "caterpillar": "CAT", "boeing": "BA",
+    "general electric": "GE", "lockheed": "LMT", "at&t": "T", "verizon": "VZ",
+}
+
+
 DEFAULT_UNIVERSE = [t for t in SECTOR_OF]
 TAPE_TICKERS = ["SPY", "QQQ", "DIA", "AAPL", "MSFT", "NVDA", "AMZN", "META", "TSLA", "JPM", "XOM", "GLD"]
 

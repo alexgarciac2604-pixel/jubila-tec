@@ -48,11 +48,11 @@ def render() -> None:
         fig.add_scatter(x=years_axis, y=path, mode="lines",
                         line=dict(width=0.5, color="rgba(96,165,250,.15)"),
                         showlegend=False)
-    for i, (name, color) in enumerate([("P10", "#f87171"), ("P50", "#e2e8f0"), ("P90", "#34d399")]):
+    for i, (name, color) in enumerate([("P10", "#DC2626"), ("P50", "#0F172A"), ("P90", "#059669")]):
         fig.add_scatter(x=years_axis, y=sim["bands"][i], name=name,
                         line=dict(width=2.2, color=color))
     if goal:
-        fig.add_hline(y=goal, line_dash="dot", line_color="#fbbf24",
+        fig.add_hline(y=goal, line_dash="dot", line_color="#D97706",
                       annotation_text="tu meta")
     fig.update_layout(title="Patrimonio real proyectado (dinero de hoy)",
                       xaxis_title="Edad", yaxis_title="$ reales")

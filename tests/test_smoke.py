@@ -355,6 +355,16 @@ def test_v082_resolve_symbol():
     assert detect_intent("¿qué te parece tesla?")["ticker"] == "TSLA"
 
 
+def test_v09_sector_map_and_workflow():
+    from src.data.market_data import SECTOR_EN_ES
+    from src.config import SECTOR_OF
+    ours = set(SECTOR_OF.values())
+    assert SECTOR_EN_ES["Technology"] == "Tecnología"
+    assert all(v in ours for v in SECTOR_EN_ES.values())  # siempre cae en un bucket válido
+    import os
+    assert os.path.exists(".github/workflows/daily.yml")   # cron del briefing en la nube
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

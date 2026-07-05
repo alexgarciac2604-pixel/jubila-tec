@@ -59,12 +59,26 @@ def render() -> None:
         wdf.columns = ["Ticker", "Nombre", "Precio", "% Día"]
         st.dataframe(wdf.style.format({"Precio": "${:.2f}", "% Día": "{:+.2f}%"}),
                      hide_index=True, use_container_width=True)
+        c1, c2 = st.columns([1, 2])
+        c1.download_button("⬇️ Respaldar lista", "\n".join(wl),
+                           file_name="mi_lista_jubilatec.txt")
+        up = c2.file_uploader("Restaurar respaldo (.txt)", type=["txt"],
+                              label_visibility="collapsed")
+        if up is not None:
+            from src.data.store import watchlist_add
+            nuevos = [ln.strip().upper() for ln in up.read().decode().splitlines()
+                      if ln.strip()]
+            for tk in nuevos:
+                watchlist_add(tk)
+            st.caption(f"✅ Lista restaurada ({len(nuevos)} tickers).")
+        st.caption("💾 En la nube, la lista se reinicia con cada actualización de la app; "
+                   "respáldala aquí y restáurala en un clic.")
 
     st.subheader("🗺️ Heatmap sectorial")
     df = get_quotes(DEFAULT_UNIVERSE)
     fig = px.treemap(
         df, path=["sector", "ticker"], values=df["price"].abs(),
-        color="change_pct", color_continuous_scale=["#f87171", "#1e293b", "#34d399"],
+        color="change_pct", color_continuous_scale=["#DC2626", "#F1F5F9", "#059669"],
         range_color=[-3, 3], hover_data={"change_pct": ":.2f"},
     )
     st.plotly_chart(dark_fig(fig, 420), use_container_width=True)

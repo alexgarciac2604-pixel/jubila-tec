@@ -89,6 +89,12 @@ Tres pisos:
 - [x] **Botón 🔄 Actualizar datos** en la sidebar (vacía cachés al instante) + hora de última actualización.
 - [x] **Lookup en vivo** (`market_data.lookup_ticker`): ante un ticker desconocido, el copiloto pregunta al proveedor antes de negar su existencia (lección SpaceX) — IPOs nuevas se analizan al vuelo.
 
+### v0.9 — Universo abierto + nube + diseño claro — ✅ 2026-07-04
+- [x] **Universo abierto**: cualquier ticker que cotice se analiza al vuelo (resolve + lookup en vivo); sectores de yfinance traducidos a nuestra taxonomía para peers y stress tests.
+- [x] **Briefing diario desde la nube**: `.github/workflows/daily.yml` corre `jobs/daily_update.py` en GitHub Actions L-V 8:30 CDMX (secrets del repo: TELEGRAM_*, FRED, NEWSAPI) — ya no depende de la PC encendida.
+- [x] **Respaldo de Mi Lista**: export/import .txt en el Dashboard (sobrevive redeploys de Streamlit Cloud). BD externa (Turso/Supabase) pendiente — requiere cuenta del usuario.
+- [x] **Rediseño claro premium**: fondo blanco, Inter + Playfair Display, esmeralda #10B981 como acento, tarjetas con hover suave, aire generoso, gráficas re-tematizadas (paleta esmeralda/rojo/azul/ámbar sobre blanco). Brief completo del sitio React (hero cinemático, etc.) archivado para Fase 5.
+
 ### Fase 5 — Escala como producto
 - [ ] FastAPI envolviendo motores; auth (Supabase); tiers free/premium (alertas, PDF, screeners ilimitados como premium).
 - [ ] Postgres + Redis + screeners nocturnos solo cuando haya usuarios reales.

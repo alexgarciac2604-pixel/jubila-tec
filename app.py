@@ -54,8 +54,8 @@ PAGES = [
 # --- sidebar ---------------------------------------------------------------
 with st.sidebar:
     st.markdown(
-        "<div style='font-family:Space Grotesk;font-weight:700;font-size:1.4rem'>📈 JUBILA-TEC</div>"
-        f"<div style='color:#94a3b8;font-size:.74rem;margin:-2px 0 1rem'>"
+        "<div style='font-family:Playfair Display,serif;font-weight:700;font-size:1.45rem;letter-spacing:-0.02em'>Jubila·Tec</div>"
+        f"<div style='color:#64748B;font-size:.74rem;margin:-2px 0 1.2rem'>"
         f"Terminal financiera · v{__version__}</div>",
         unsafe_allow_html=True,
     )

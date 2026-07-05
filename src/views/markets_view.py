@@ -18,7 +18,7 @@ def render() -> None:
     st.subheader("Desempeño por sector (hoy)")
     sec = df.groupby("sector")["change_pct"].mean().sort_values()
     fig = px.bar(sec, orientation="h",
-                 color=sec.values, color_continuous_scale=["#f87171", "#94a3b8", "#34d399"],
+                 color=sec.values, color_continuous_scale=["#DC2626", "#E2E8F0", "#059669"],
                  labels={"value": "% cambio", "sector": ""})
     fig.update_coloraxes(showscale=False)
     st.plotly_chart(dark_fig(fig), use_container_width=True)

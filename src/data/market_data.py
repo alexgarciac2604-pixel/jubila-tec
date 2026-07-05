@@ -51,6 +51,16 @@ def get_history(ticker: str, period: str = "2y") -> pd.DataFrame:
     return sd.sample_history(ticker)
 
 
+# sectores en inglés de yfinance → nuestra taxonomía (peers y stress tests)
+SECTOR_EN_ES = {
+    "Technology": "Tecnología", "Communication Services": "Comunicación",
+    "Consumer Cyclical": "Consumo Disc.", "Financial Services": "Financiero",
+    "Healthcare": "Salud", "Energy": "Energía",
+    "Consumer Defensive": "Consumo Básico", "Industrials": "Industrial",
+    "Basic Materials": "Industrial", "Utilities": "Energía",
+    "Real Estate": "Financiero",
+}
+
 _YF_MAP = {  # info de yfinance → claves estándar
     "longName": "name", "sector": "sector", "marketCap": "market_cap",
     "sharesOutstanding": "shares", "beta": "beta", "totalRevenue": "revenue",
@@ -78,6 +88,9 @@ def get_fundamentals(ticker: str) -> dict:
                 if v is not None:
                     base[dst_key] = v
             base["source"] = "yfinance"
+            sec = base.get("sector", "")
+            base["sector"] = SECTOR_EN_ES.get(sec, sec if sec in
+                set(SECTOR_OF.values()) else "Otro")
         except Exception:
             pass
     return base

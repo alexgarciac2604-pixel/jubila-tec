@@ -39,7 +39,7 @@ def render() -> None:
 
     top = df.head(10)
     fig = px.bar(top, x="score", y="ticker", orientation="h", color="score",
-                 color_continuous_scale=["#475569", "#60a5fa", "#34d399"],
+                 color_continuous_scale=["#94A3B8", "#2563EB", "#059669"],
                  hover_data=["name", "drawdown_52w_pct"])
     fig.update_layout(yaxis=dict(autorange="reversed"))
     fig.update_coloraxes(showscale=False)

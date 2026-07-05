@@ -1,0 +1,25 @@
+name: Briefing diario
+
+on:
+  schedule:
+    - cron: "30 14 * * 1-5"   # 8:30 am CDMX (UTC-6), lunes a viernes
+  workflow_dispatch: {}        # botón para dispararlo a mano
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Dependencias mínimas del job
+        run: pip install numpy pandas requests yfinance python-dotenv
+      - name: Actualización diaria (scores, alertas, briefing → Telegram)
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          JT_DB_PATH: /tmp/jt.db
+        run: python jobs/daily_update.py

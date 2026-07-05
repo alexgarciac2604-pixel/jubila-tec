@@ -21,13 +21,13 @@ def render() -> None:
     c1, c2 = st.columns(2)
     for i, name in enumerate(names):
         fig = px.line(series[name], labels={"value": "", "index": ""}, title=name)
-        fig.update_traces(line_color="#60a5fa")
+        fig.update_traces(line_color="#2563EB")
         (c1 if i % 2 == 0 else c2).plotly_chart(dark_fig(fig, 260), use_container_width=True)
 
     st.subheader("📉 Curva de rendimientos (Tesoro EE.UU.)")
     curve = yield_curve()
     fig = px.line(curve, markers=True, labels={"value": "%", "index": "Plazo"})
-    fig.update_traces(line_color="#fbbf24")
+    fig.update_traces(line_color="#D97706")
     st.plotly_chart(dark_fig(fig, 300), use_container_width=True)
     st.info(curve_signal(curve))
 
@@ -38,7 +38,7 @@ def render() -> None:
     st.markdown(f"**Región:** {ev['region']} — {ev['note']}")
     imp = pd.Series(ev["impacts"]).sort_values()
     fig = px.bar(imp, orientation="h", color=imp.values,
-                 color_continuous_scale=["#f87171", "#94a3b8", "#34d399"],
+                 color_continuous_scale=["#DC2626", "#E2E8F0", "#059669"],
                  range_color=[-2, 2], labels={"value": "impacto (-2 a +2)", "index": ""})
     fig.update_coloraxes(showscale=False)
     st.plotly_chart(dark_fig(fig, 300), use_container_width=True)

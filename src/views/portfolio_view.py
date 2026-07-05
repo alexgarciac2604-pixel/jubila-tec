@@ -56,7 +56,7 @@ def render() -> None:
         st.subheader("Contribución al riesgo")
         rc = pd.DataFrame({"Activo": tickers, "Contribución": stats["risk_contrib_pct"]})
         fig = px.bar(rc.sort_values("Contribución"), x="Contribución", y="Activo",
-                     orientation="h", color_discrete_sequence=["#60a5fa"])
+                     orientation="h", color_discrete_sequence=["#2563EB"])
         fig.update_layout(xaxis_tickformat=".0%")
         st.plotly_chart(dark_fig(fig), use_container_width=True)
 
@@ -71,7 +71,7 @@ def render() -> None:
     sdf = portfolio_stress(tickers, w)
     st.dataframe(
         sdf.style.map(
-            lambda v: "color:#f87171" if isinstance(v, float) and v < 0 else "color:#34d399",
+            lambda v: "color:#DC2626" if isinstance(v, float) and v < 0 else "color:#059669",
             subset=["P&L estimado %"],
         ),
         hide_index=True, use_container_width=True,
@@ -85,7 +85,7 @@ def render() -> None:
                      color_continuous_scale="Tealgrn",
                      labels={"vol": "Volatilidad", "ret": "Retorno esperado"})
     fig.add_scatter(x=[stats["ann_vol"]], y=[stats["ann_return"]], mode="markers",
-                    marker=dict(size=14, color="#f87171", symbol="star"), name="Tu portafolio")
+                    marker=dict(size=14, color="#DC2626", symbol="star"), name="Tu portafolio")
     st.plotly_chart(dark_fig(fig, 380), use_container_width=True)
 
     st.subheader("Proyección Monte Carlo (colas gordas, 5 años, base 100)")
@@ -94,7 +94,7 @@ def render() -> None:
     fig = go.Figure()
     for i in range(0, 60):
         fig.add_scatter(y=paths[i], mode="lines",
-                        line=dict(width=0.6, color="rgba(96,165,250,.25)"),
+                        line=dict(width=0.6, color="rgba(37,99,235,.20)"),
                         showlegend=False)
     st.plotly_chart(dark_fig(fig, 340), use_container_width=True)
     st.caption(

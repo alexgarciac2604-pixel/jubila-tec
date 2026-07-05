@@ -139,8 +139,8 @@ def render(ticker: str) -> None:
         )
         mc = monte_carlo_dcf(v["fcf"], growth, wacc, tg, net_debt=v["net_debt"],
                              shares=f.get("shares") or 1, n=2000)
-        fig = go.Figure(go.Histogram(x=mc["values"], nbinsx=60, marker_color="#60a5fa"))
-        fig.add_vline(x=q["price"], line_color="#f87171",
+        fig = go.Figure(go.Histogram(x=mc["values"], nbinsx=60, marker_color="#2563EB"))
+        fig.add_vline(x=q["price"], line_color="#DC2626",
                       annotation_text="precio actual")
         fig.update_layout(title=f"Monte Carlo del valor (P10 {fmt_money(mc['p10'])} · "
                                 f"P50 {fmt_money(mc['p50'])} · P90 {fmt_money(mc['p90'])})")

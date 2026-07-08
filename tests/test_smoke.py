@@ -365,6 +365,45 @@ def test_v09_sector_map_and_workflow():
     assert os.path.exists(".github/workflows/daily.yml")   # cron del briefing en la nube
 
 
+def test_v010_screener():
+    import os
+    os.environ["JT_SCREENER_PATH"] = "/tmp/jt_screener.json"
+    from src.screener.engine import load_screener, run_screener, save_screener, screen_ticker
+    from src.config import SCREENER_UNIVERSE
+    assert len(SCREENER_UNIVERSE) >= 100 and "SPCX" in SCREENER_UNIVERSE
+    r = screen_ticker("AAPL")
+    assert r and 0 <= r["score"] <= 100 and r["price"] > 0
+    data = run_screener(["AAPL", "MSFT", "XOM", "JNJ", "KO"])
+    assert data["n"] == 5
+    scores = [row["score"] for row in data["rows"]]
+    assert scores == sorted(scores, reverse=True)   # ordenado de mejor a peor
+    save_screener(data)
+    back = load_screener()
+    assert back and back["n"] == 5 and back["date"] == data["date"]
+
+
+def test_v011_clients():
+    from src.clients import manager as cm
+    for c in cm.list_clients():
+        cm.delete_client(c["id"])                       # estado limpio
+    assert cm.create_client("C-001", "Juan Pérez", "1234", "moderado", 100_000)
+    assert not cm.create_client("c-001", "Otro", "9999")  # id duplicado → False
+    assert cm.verify_client("C-001", "1234")["name"] == "Juan Pérez"
+    assert cm.verify_client("juan pérez", "1234")["id"] == "C-001"  # login por nombre
+    assert cm.verify_client("C-001", "0000") is None       # PIN incorrecto
+    cm.set_portfolio("C-001", ["AAPL", "MSFT", "JNJ"], [0.4, 0.35, 0.25],
+                     {"AAPL": 200.0, "MSFT": 400.0, "JNJ": 150.0})
+    h = cm.get_portfolio("C-001")
+    assert len(h) == 3 and abs(sum(x["weight"] for x in h) - 1) < 1e-9
+    assert h[0]["price_at"] > 0                            # precio de entrada congelado
+    backup = cm.export_all()
+    cm.delete_client("C-001")
+    assert cm.list_clients() == [] and cm.get_portfolio("C-001") == []
+    assert cm.import_all(backup) == 1                      # respaldo restaura todo
+    assert cm.verify_client("C-001", "1234") is not None
+    cm.delete_client("C-001")
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

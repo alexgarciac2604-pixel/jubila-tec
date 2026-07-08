@@ -95,6 +95,17 @@ Tres pisos:
 - [x] **Respaldo de Mi Lista**: export/import .txt en el Dashboard (sobrevive redeploys de Streamlit Cloud). BD externa (Turso/Supabase) pendiente — requiere cuenta del usuario.
 - [x] **Rediseño claro premium**: fondo blanco, Inter + Playfair Display, esmeralda #10B981 como acento, tarjetas con hover suave, aire generoso, gráficas re-tematizadas (paleta esmeralda/rojo/azul/ámbar sobre blanco). Brief completo del sitio React (hero cinemático, etc.) archivado para Fase 5.
 
+### v0.10 — Screener nocturno (universo ×3) — ✅ 2026-07-04
+- [x] **SCREENER_UNIVERSE**: ~104 empresas (S&P-100 aprox + SPCX) en config.
+- [x] **Motor ligero** (`screener/engine.py`): calidad 35 + técnico 35 + valoración 30 (sin noticias/forense por honestidad y costo); candado anti-sintético incluido.
+- [x] **Publicación automática**: el cron diario calcula y commitea `data/screener.json` al repo (permissions contents:write) → Streamlit redeploya y la vista lee al instante.
+- [x] **Underdog ampliado**: toggle 🌙 muestra las ~104 pre-calculadas con filtro por sector, top-10 y export CSV. Nota: el commit diario redeploya la app cada madrugada (Mi Lista en la nube se reinicia → usar respaldo/restauración).
+
+### v0.11 — Portal de clientes — ✅ 2026-07-04
+- [x] **Gestor** (`clients/manager.py`): clientes con número/nombre + PIN hasheado (SHA-256 salado), perfil de riesgo y capital; portafolios asignados con **precio de entrada congelado** → rendimiento real desde la asignación; respaldo/restauración JSON.
+- [x] **Vista 👥 Clientes**: login por número o nombre (Unicode-safe) + PIN → panel del cliente (posiciones, P&L, pie, Sharpe/vol/drawdown, proyección Monte Carlo 5a, stress tests). Admin protegible con secret JT_ADMIN_PIN: alta de clientes, constructor de portafolios (sugerencia por perfil + 5 optimizadores), asignación en un clic.
+- [x] Nota de compliance visible: herramienta de registro/reporte; uso comercial puede requerir registro como asesor (CNBV/SEC). PIN ≠ seguridad bancaria; auth real llega con Fase 5.
+
 ### Fase 5 — Escala como producto
 - [ ] FastAPI envolviendo motores; auth (Supabase); tiers free/premium (alertas, PDF, screeners ilimitados como premium).
 - [ ] Postgres + Redis + screeners nocturnos solo cuando haya usuarios reales.

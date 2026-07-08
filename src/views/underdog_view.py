@@ -18,6 +18,42 @@ def render() -> None:
     )
     source_caption()
 
+    from src.screener.engine import load_screener
+    scr = load_screener()
+    if scr and scr.get("rows"):
+        if st.toggle(f"🌙 Universo ampliado — screener nocturno "
+                     f"({scr['n']} empresas · {scr['date']})", value=True):
+            import pandas as pd
+            sdf = pd.DataFrame(scr["rows"])
+            secs = ["Todos"] + sorted(sdf["sector"].dropna().unique().tolist())
+            sec = st.selectbox("Sector", secs, key="scr_sector")
+            if sec != "Todos":
+                sdf = sdf[sdf["sector"] == sec]
+            top = sdf.head(10)
+            fig = px.bar(top, x="score", y="ticker", orientation="h", color="score",
+                         color_continuous_scale=["#94A3B8", "#2563EB", "#059669"],
+                         hover_data=["name", "desde_max_pct"])
+            fig.update_layout(yaxis=dict(autorange="reversed"))
+            fig.update_coloraxes(showscale=False)
+            st.plotly_chart(dark_fig(fig), use_container_width=True)
+            show = sdf.rename(columns={
+                "ticker": "Ticker", "name": "Nombre", "sector": "Sector",
+                "price": "Precio", "score": "Score", "calidad": "Calidad",
+                "tecnico": "Técnico", "valoracion": "Valoración",
+                "upside_pct": "Upside %", "mom_6m": "Mom 6m %",
+                "desde_max_pct": "% desde máx",
+            })
+            st.dataframe(show, hide_index=True, use_container_width=True, height=480)
+            download_df(show, "jubilatec_screener.csv")
+            st.caption(
+                f"Score de screening (calidad 35 · técnico 35 · valoración 30), "
+                f"pre-calculado de madrugada — fuente {scr['source']}. Para el "
+                "score completo (con noticias, forense y régimen), analiza el "
+                "ticker en la barra lateral."
+            )
+            return
+        st.divider()
+
     sectors = ["Todos"] + sorted(set(SECTOR_OF.values()))
     sector = st.selectbox("Sector", sectors)
     universe = DEFAULT_UNIVERSE if sector == "Todos" else [

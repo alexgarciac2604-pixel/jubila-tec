@@ -8,6 +8,8 @@ on:
 jobs:
   briefing:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,3 +25,9 @@ jobs:
           NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
           JT_DB_PATH: /tmp/jt.db
         run: python jobs/daily_update.py
+      - name: Publicar screener en el repo
+        run: |
+          git config user.name "jubilatec-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/screener.json
+          git diff --cached --quiet || (git commit -m "chore: screener nocturno $(date -u +%F)" && git push)

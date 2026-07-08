@@ -21,7 +21,7 @@ st.set_page_config(
 from src import __version__
 from src.config import DISCLAIMER, get_settings
 from src.utils.styles import inject_css
-from src.views import (about, alerts_view, backtest_view, copilot_view, dashboard, macro_view,
+from src.views import (about, alerts_view, backtest_view, clients_view, copilot_view, dashboard, macro_view,
                        markets_view, news_view, portfolio_view,
                        retirement_view, sources_view, stock, underdog_view)
 from src.views.components import render_ticker_tape
@@ -42,6 +42,7 @@ PAGES = [
     "🗺️ Mercados",
     "🐤 Underdog",
     "💼 Portafolio",
+    "👥 Clientes",
     "🎯 Jubilación",
     "🧪 Backtesting",
     "🌍 Macro & Geopolítica",
@@ -108,6 +109,7 @@ _routes = {
     "🗺️ Mercados": markets_view.render,
     "🐤 Underdog": underdog_view.render,
     "💼 Portafolio": portfolio_view.render,
+    "👥 Clientes": clients_view.render,
     "🎯 Jubilación": retirement_view.render,
     "🧪 Backtesting": backtest_view.render,
     "🌍 Macro & Geopolítica": macro_view.render,

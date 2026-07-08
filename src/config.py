@@ -76,6 +76,21 @@ NAME_TO_TICKER = {
 DEFAULT_UNIVERSE = [t for t in SECTOR_OF]
 TAPE_TICKERS = ["SPY", "QQQ", "DIA", "AAPL", "MSFT", "NVDA", "AMZN", "META", "TSLA", "JPM", "XOM", "GLD"]
 
+# universo AMPLIADO para el screener nocturno (S&P-100 aprox + SPCX)
+SCREENER_UNIVERSE = [
+    "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AVGO", "BRK-B",
+    "LLY", "JPM", "V", "UNH", "XOM", "MA", "JNJ", "PG", "HD", "COST", "MRK",
+    "ABBV", "CVX", "CRM", "AMD", "PEP", "KO", "WMT", "BAC", "NFLX", "ACN",
+    "TMO", "MCD", "CSCO", "ABT", "LIN", "ADBE", "ORCL", "DIS", "WFC", "INTC",
+    "VZ", "CAT", "QCOM", "IBM", "GE", "TXN", "CMCSA", "AMGN", "INTU", "NOW",
+    "PFE", "UNP", "PM", "SPGI", "HON", "RTX", "NKE", "LOW", "T", "UPS",
+    "COP", "SCHW", "BA", "MS", "ELV", "BLK", "GS", "AXP", "DE", "BKNG",
+    "MDT", "LMT", "SBUX", "PLD", "ADP", "GILD", "BMY", "MDLZ", "ADI", "TJX",
+    "MMC", "CVS", "SYK", "VRTX", "AMT", "C", "ZTS", "CI", "MO", "SO",
+    "TMUS", "CB", "REGN", "PGR", "BSX", "ETN", "EOG", "SLB", "DUK", "CL",
+    "FDX", "ITW", "EMR", "NOC", "SPCX",
+]
+
 RISK_FREE = 0.042  # tasa libre de riesgo anual por defecto
 
 

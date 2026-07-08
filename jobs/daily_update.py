@@ -58,10 +58,19 @@ def run(verbose: bool = True) -> dict:
         send_telegram(brief.replace("**", "").replace("*", ""))
         if telegram_configured() else False
     )
+    try:                                # screener nocturno del universo amplio
+        from src.screener.engine import save_screener, run_screener
+        scr = run_screener()
+        save_screener(scr)
+        result["screener_n"] = scr["n"]
+    except Exception as e:              # noqa: BLE001
+        result["errors"].append(f"screener: {e}")
+
     result["seconds"] = round((datetime.now() - started).total_seconds(), 1)
 
     line = (f"[{started:%Y-%m-%d %H:%M}] scores {result['scores_ok']}/{len(DEFAULT_UNIVERSE)} · "
             f"alertas {result['alerts_fired']} · briefing_tg {result['briefing_sent']} · "
+            f"screener {result.get('screener_n', 0)} · "
             f"{result['seconds']}s · errores {len(result['errors'])}")
     try:                                # bitácora persistente
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

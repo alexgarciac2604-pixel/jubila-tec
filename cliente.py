@@ -57,6 +57,16 @@ with centro:
         unsafe_allow_html=True,
     )
 
+    from src.data.dbx import backend, ping
+    if backend() != "turso":
+        st.warning("⚠️ Este portal usa una base LOCAL: faltan TURSO_DATABASE_URL "
+                   "y TURSO_AUTH_TOKEN en los Secrets de ESTA app, así que no ve "
+                   "los clientes creados en el Studio.")
+    else:
+        _ok, _msg = ping()
+        if not _ok:
+            st.error(f"⚠️ Sin conexión a la base compartida: {_msg}")
+
     intentos = st.session_state.get("login_intentos", 0)
     if intentos >= MAX_INTENTOS:
         st.error("Demasiados intentos fallidos. Cierra esta pestaña, espera unos "

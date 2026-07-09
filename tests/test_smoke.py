@@ -499,3 +499,64 @@ def test_v014_cuenta_viva():
     assert "rumbo" in cm.get_note("C-014")["nota"]
 
     cm.delete_client("C-014")
+
+
+def test_v016_ordenes_y_practica():
+    """Órdenes al asesor (aprobar/rechazar con matemática de efectivo) y paper."""
+    from src.clients import manager as cm
+    for c in cm.list_clients():
+        cm.delete_client(c["id"])
+    assert cm.create_client("C-016", "Leo Ruiz", "1357", "moderado", 50_000)
+
+    # compra que excede el efectivo → rechazo con mensaje claro
+    cm.create_order("C-016", "compra", "AAPL", 80_000, "test")
+    oid = [o for o in cm.get_orders("C-016") if o["estado"] == "pendiente"][0]["id"]
+    ok, msg = cm.approve_order(oid)
+    assert not ok and "Efectivo insuficiente" in msg
+    cm.reject_order(oid)
+    assert cm.get_orders("C-016")[0]["estado"] == "rechazada"
+
+    # compra válida → holding creado, efectivo baja, movimiento registrado
+    cm.create_order("C-016", "compra", "AAPL", 10_000, "test")
+    oid = [o for o in cm.get_orders("C-016") if o["estado"] == "pendiente"][0]["id"]
+    ok, msg = cm.approve_order(oid)
+    assert ok, msg
+    h = cm.get_portfolio("C-016")
+    assert len(h) == 1 and abs(h[0]["invested"] - 10_000) < 0.01
+    assert abs(h[0]["weight"] - 1.0) < 1e-9              # pesos recalculados
+    assert cm.get_capital("C-016") == 50_000             # comprar no toca capital
+    assert any(m["tipo"] == "Compra" for m in cm.get_movements("C-016"))
+
+    # segunda aprobación de la misma orden → bloqueada
+    ok, msg = cm.approve_order(oid)
+    assert not ok and "aprobada" in msg
+
+    # venta parcial al mismo precio → invertido baja, sin G/P realizada
+    cm.create_order("C-016", "venta", "AAPL", 4_000, "test")
+    oid = [o for o in cm.get_orders("C-016") if o["estado"] == "pendiente"][0]["id"]
+    ok, msg = cm.approve_order(oid)
+    assert ok, msg
+    h = cm.get_portfolio("C-016")[0]
+    assert abs(h["invested"] - 6_000) < 1.0
+    assert abs(cm.get_capital("C-016") - 50_000) < 1.0   # px estable → G/P ≈ 0
+
+    # venta de lo que no tiene → error honesto
+    cm.create_order("C-016", "venta", "MSFT", 1_000, "test")
+    oid = [o for o in cm.get_orders("C-016") if o["estado"] == "pendiente"][0]["id"]
+    ok, msg = cm.approve_order(oid)
+    assert not ok and "no tiene MSFT" in msg
+
+    # simulador: 100k ficticios, compra, venta y reset
+    ps = cm.paper_state("C-016")
+    assert ps["cash"] == 100_000 and ps["positions"] == []
+    ok, _ = cm.paper_trade("C-016", "compra", "NVDA", 20_000)
+    assert ok
+    ps = cm.paper_state("C-016")
+    assert abs(ps["cash"] - 80_000) < 0.01 and len(ps["positions"]) == 1
+    ok, _ = cm.paper_trade("C-016", "venta", "NVDA", 5_000)
+    assert ok and abs(cm.paper_state("C-016")["cash"] - 85_000) < 1.0
+    cm.paper_reset("C-016")
+    ps = cm.paper_state("C-016")
+    assert ps["cash"] == 100_000 and ps["positions"] == []
+
+    cm.delete_client("C-016")

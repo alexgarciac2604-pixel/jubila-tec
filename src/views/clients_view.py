@@ -13,12 +13,14 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from src.clients.manager import (add_deposit, close_request, create_client,
-                                 create_request, delete_client, export_all,
-                                 get_capital, get_movements, get_note,
+from src.clients.manager import (add_deposit, approve_order, close_request,
+                                 create_client, create_order, create_request,
+                                 delete_client, export_all, get_capital,
+                                 get_movements, get_note, get_orders,
                                  get_portfolio, get_requests, import_all,
-                                 list_clients, set_note, set_portfolio,
-                                 verify_client)
+                                 list_clients, paper_reset, paper_state,
+                                 paper_trade, reject_order, set_note,
+                                 set_portfolio, verify_client)
 from src.config import DEFAULT_UNIVERSE, RISK_FREE, get_secret
 from src.data.market_data import get_history, get_quote
 from src.models.risk import monte_carlo_paths
@@ -85,8 +87,47 @@ div[role="radiogroup"] label:has(input:checked) p { color:#FAF7F0 !important; }
 </style>
 """
 
-_NAV = ["💼 Resumen", "📊 Mi portafolio", "🧾 Movimientos",
-        "💡 Ideas & noticias", "✉️ Solicitudes"]
+_NAV = ["💼 Resumen", "📊 Mi portafolio", "🛒 Invertir", "🎓 Práctica",
+        "🧾 Movimientos", "💡 Ideas & noticias", "✉️ Solicitudes"]
+
+_ROL_SECTOR = {
+    "Consumo Básico": "darte estabilidad: la gente compra sus productos "
+                      "en las buenas y en las malas",
+    "Salud": "darte estabilidad: la salud no depende del ciclo económico",
+    "Financiero": "generar ingresos sólidos ligados a la economía",
+    "Tecnología": "darte crecimiento a largo plazo",
+    "Comunicación": "darte crecimiento con marcas que usas a diario",
+    "Consumo Disc.": "crecer cuando la economía va bien",
+    "Energía": "protegerte cuando sube el petróleo y la inflación",
+    "Industrial": "acompañar el crecimiento de la economía real",
+}
+
+
+def _semaforo(score) -> tuple[str, str]:
+    if score >= 70:
+        return "🟢", "sólida"
+    if score >= 45:
+        return "🟡", "aceptable"
+    return "🔴", "débil"
+
+
+def _por_que(ticker: str, sector: str, row: dict | None) -> str:
+    """Explica una posición en lenguaje que cualquiera entiende."""
+    rol = _ROL_SECTOR.get(sector, "diversificar tu portafolio")
+    partes = [f"Está en tu portafolio para **{rol}**."]
+    if row:
+        emoji, calif = _semaforo(row.get("score", 50))
+        partes.insert(0, f"Nuestro análisis la califica **{calif} "
+                         f"({row.get('score', '—')}/100 {emoji})**.")
+        if row.get("calidad", 0) >= 60:
+            partes.append("Gana dinero de forma consistente (buena calidad).")
+        if row.get("valoracion", 0) >= 60:
+            partes.append("Su precio luce razonable frente a lo que gana.")
+        elif row.get("valoracion", 0) < 40:
+            partes.append("Su precio está algo exigente: por eso pesa lo que pesa.")
+        if row.get("tecnico", 0) >= 60:
+            partes.append("Además viene con buen impulso de mercado.")
+    return " ".join(partes)
 
 
 def _tint(v) -> str:
@@ -274,6 +315,17 @@ def _client_panel(client: dict) -> None:
                     ["Rend. %"]),
                 hide_index=True, use_container_width=True)
 
+            with st.expander("💬 ¿Por qué tengo estas empresas?"):
+                from src.screener.engine import load_screener as _ls
+                _scr = _ls()
+                _map = ({r["ticker"]: r for r in _scr["rows"]}
+                        if _scr and _scr.get("rows") else {})
+                from src.config import SECTOR_OF
+                for h in holdings:
+                    t = h["ticker"]
+                    sec = (_map.get(t) or {}).get("sector") or SECTOR_OF.get(t, "")
+                    st.markdown(f"**{t}** — {_por_que(t, sec, _map.get(t))}")
+
             if serie is not None:
                 try:
                     spy = get_history("SPY").Close
@@ -340,8 +392,105 @@ def _client_panel(client: dict) -> None:
             st.download_button("📄 Descargar mi estado de cuenta", reporte,
                                file_name=f"alx_{client['id']}_{_date.today()}.md")
 
-    # ---------------------------------------------------------- Movimientos --
+    # ------------------------------------------------------------- Invertir --
     elif nav == _NAV[2]:
+        st.markdown("**🛒 Envía una orden a tu asesor**")
+        st.caption("Tu asesor revisa cada orden con el análisis de AL-X y la "
+                   "ejecuta si procede. Verás el resultado en Movimientos.")
+        from src.screener.engine import load_screener
+        scr = load_screener()
+        scr_map = ({r["ticker"]: r for r in scr["rows"]}
+                   if scr and scr.get("rows") else {})
+        universo = sorted(set(DEFAULT_UNIVERSE)
+                          | {h["ticker"] for h in holdings})
+        with st.form("orden"):
+            c1, c2, c3 = st.columns([1, 1.4, 1])
+            side = c1.radio("Operación", ["compra", "venta"],
+                            format_func=str.capitalize, horizontal=True)
+            tk = c2.selectbox("Empresa", universo)
+            monto = c3.number_input("Monto ($)", 100.0, 1e8, 5_000.0,
+                                    step=500.0)
+            row = scr_map.get(tk)
+            if row:
+                emoji, calif = _semaforo(row.get("score", 50))
+                st.caption(f"Análisis AL-X de {tk}: **{calif} "
+                           f"{row.get('score', '—')}/100 {emoji}** · "
+                           f"precio ${row.get('price', 0):,.2f} · "
+                           f"sector {row.get('sector', '—')}")
+            if st.form_submit_button("Enviar orden al asesor", type="primary"):
+                analisis = (f"Score AL-X {row.get('score', '—')}/100"
+                            if row else "sin análisis nocturno")
+                create_order(client["id"], side, tk, monto, analisis)
+                st.success(f"✅ Orden de {side} de {tk} por ${monto:,.0f} "
+                           "enviada. Tu asesor la revisará.")
+        st.caption(f"💵 Efectivo disponible: {fmt_money(efectivo)} — las compras "
+                   "se descuentan de ahí cuando tu asesor las aprueba.")
+        ords = get_orders(client["id"])
+        if ords:
+            st.markdown("**Tus órdenes**")
+            iconos = {"pendiente": "🟡", "aprobada": "✅", "rechazada": "🔴"}
+            for o in ords[:10]:
+                st.markdown(
+                    f"{iconos.get(o['estado'], '·')} *{o['date']}* — "
+                    f"{o['side'].capitalize()} **{o['ticker']}** "
+                    f"${o['monto']:,.0f} · {o['estado']}"
+                    + (f" — {o['nota']}" if o["estado"] == "rechazada" else ""))
+
+    # ------------------------------------------------------------- Práctica --
+    elif nav == _NAV[3]:
+        st.markdown("**🎓 Cartera de práctica — aprende sin arriesgar**")
+        st.caption("Te regalamos **$100,000 ficticios** para practicar con "
+                   "precios reales. Aquí las operaciones son instantáneas y "
+                   "equivocarse no cuesta nada.")
+        ps = paper_state(client["id"])
+        prows, pval = [], 0.0
+        for pp in ps["positions"]:
+            pxn = get_quote(pp["ticker"])["price"]
+            val = pp["units"] * pxn
+            cost = pp["units"] * pp["price_at"]
+            prows.append({"Ticker": pp["ticker"], "Unidades": pp["units"],
+                          "P. compra": pp["price_at"], "P. actual": pxn,
+                          "Valor": val,
+                          "Rend. %": (val / cost - 1) * 100 if cost else 0.0})
+            pval += val
+        ptotal = ps["cash"] + pval
+        ppl = ptotal - 100_000.0
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Valor total (ficticio)", fmt_money(ptotal),
+                  fmt_pct(ppl / 100_000.0 * 100))
+        c2.metric("Efectivo virtual", fmt_money(ps["cash"]))
+        c3.metric("Invertido", fmt_money(pval))
+        with st.form("paper"):
+            c1, c2, c3 = st.columns([1, 1.4, 1])
+            pside = c1.radio("Operación", ["compra", "venta"],
+                             format_func=str.capitalize, horizontal=True,
+                             key="paper_side")
+            ptk = c2.selectbox("Empresa", sorted(DEFAULT_UNIVERSE),
+                               key="paper_tk")
+            pmonto = c3.number_input("Monto ($)", 100.0, 1e6, 5_000.0,
+                                     step=500.0, key="paper_monto")
+            if st.form_submit_button("Ejecutar (práctica)", type="primary"):
+                ok, msg = paper_trade(client["id"], pside, ptk, pmonto)
+                (st.success if ok else st.error)(msg)
+                if ok:
+                    st.rerun()
+        if prows:
+            pdf_ = pd.DataFrame(prows)
+            st.dataframe(
+                _paint(pdf_.style.format(
+                    {"Unidades": "{:.3f}", "P. compra": "${:.2f}",
+                     "P. actual": "${:.2f}", "Valor": "${:,.0f}",
+                     "Rend. %": "{:+.1f}%"}), ["Rend. %"]),
+                hide_index=True, use_container_width=True)
+        if st.button("🔄 Reiniciar mi cartera de práctica"):
+            paper_reset(client["id"])
+            st.rerun()
+        st.caption("💡 Consejo: antes de invertir de verdad, practica aquí una "
+                   "estrategia durante unas semanas y compárala con tu "
+                   "portafolio real.")
+
+    # ---------------------------------------------------------- Movimientos --
+    elif nav == _NAV[4]:
         movs = get_movements(client["id"])
         if not movs:
             st.info("Aún no hay movimientos registrados.")
@@ -364,7 +513,7 @@ def _client_panel(client: dict) -> None:
                        f"Actualizado {datetime.now():%H:%M}")
 
     # ------------------------------------------------------ Ideas & noticias --
-    elif nav == _NAV[3]:
+    elif nav == _NAV[5]:
         nota = get_note(client["id"])
         if nota:
             st.markdown(
@@ -465,6 +614,25 @@ def _admin_panel() -> None:
             st.error(f"☁️ Turso configurado pero SIN conexión: {msg}\n\n"
                      "Revisa que TURSO_DATABASE_URL empiece con libsql:// y que el "
                      "token sea el de ESTA base (crea uno nuevo si hace falta).")
+
+    ord_pend = [o for o in get_orders() if o["estado"] == "pendiente"]
+    with st.expander(f"🛒 Órdenes de clientes ({len(ord_pend)} pendientes)",
+                     expanded=bool(ord_pend)):
+        if not ord_pend:
+            st.caption("Sin órdenes pendientes.")
+        for o in ord_pend:
+            c1, c2, c3 = st.columns([4, 1, 1])
+            c1.markdown(f"**{o['client_id']}** · *{o['date']}* — "
+                        f"{o['side'].capitalize()} **{o['ticker']}** "
+                        f"${o['monto']:,.0f} · {o['nota']}")
+            if c2.button("✅ Aprobar", key=f"ok_{o['id']}"):
+                ok, msg = approve_order(o["id"])
+                (st.success if ok else st.error)(msg)
+                if ok:
+                    st.rerun()
+            if c3.button("🔴 Rechazar", key=f"no_{o['id']}"):
+                reject_order(o["id"])
+                st.rerun()
 
     pendientes = [r for r in get_requests() if r["estado"] == "pendiente"]
     with st.expander(f"✉️ Solicitudes de clientes ({len(pendientes)} pendientes)",

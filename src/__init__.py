@@ -1,2 +1,2 @@
 """AL-X Studio — núcleo analítico (independiente de Streamlit)."""
-__version__ = "0.15.0"
+__version__ = "0.16.0"

@@ -206,3 +206,194 @@ def get_note(cid: str) -> dict | None:
         return {"nota": rows[0][0], "updated": rows[0][1]} if rows else None
     except Exception:
         return None
+
+
+# ------------------------------------------- v0.16: órdenes al asesor ----
+def create_order(cid: str, side: str, ticker: str, monto: float,
+                 nota: str = "") -> None:
+    """El cliente PIDE comprar/vender; nada se ejecuta hasta que el asesor
+    aprueba. Registro y reporte — la app no custodia dinero ni valores."""
+    import uuid
+    execute("INSERT INTO orders VALUES (?,?,?,?,?,?,?,?)",
+            (uuid.uuid4().hex[:12], cid.upper(), str(date.today()),
+             side, ticker.upper(), float(monto), "pendiente", nota[:400]))
+
+
+def get_orders(cid: str | None = None) -> list[dict]:
+    try:
+        if cid:
+            rows = query("SELECT id, client_id, date, side, ticker, monto, "
+                         "estado, nota FROM orders WHERE client_id=? "
+                         "ORDER BY date DESC, rowid DESC", (cid.upper(),))
+        else:
+            rows = query("SELECT id, client_id, date, side, ticker, monto, "
+                         "estado, nota FROM orders ORDER BY estado DESC, date DESC, rowid DESC")
+        return [{"id": r[0], "client_id": r[1], "date": r[2], "side": r[3],
+                 "ticker": r[4], "monto": r[5], "estado": r[6], "nota": r[7]}
+                for r in rows]
+    except Exception:
+        return []
+
+
+def reject_order(order_id: str, motivo: str = "") -> None:
+    execute("UPDATE orders SET estado=?, nota=? WHERE id=?",
+            (f"rechazada", (motivo or "Rechazada por el asesor")[:400], order_id))
+
+
+def _holdings_map(cid: str) -> dict[str, dict]:
+    return {h["ticker"]: h for h in get_portfolio(cid)}
+
+
+def _reweigh(cid: str) -> None:
+    """Recalcula pesos = invertido_i / total invertido (informativo)."""
+    hs = get_portfolio(cid)
+    total = sum(h.get("invested") or 0.0 for h in hs)
+    if total <= 0:
+        return
+    execute_many([
+        ("UPDATE holdings SET weight=? WHERE client_id=? AND ticker=?",
+         (float((h.get("invested") or 0.0) / total), cid.upper(), h["ticker"]))
+        for h in hs
+    ])
+
+
+def approve_order(order_id: str) -> tuple[bool, str]:
+    """Ejecuta la orden a precio actual. (ok, mensaje)."""
+    from src.data.market_data import get_quote
+    rows = query("SELECT client_id, side, ticker, monto, estado FROM orders "
+                 "WHERE id=?", (order_id,))
+    if not rows:
+        return False, "Orden no encontrada."
+    cid, side, ticker, monto, estado = rows[0]
+    if estado != "pendiente":
+        return False, f"La orden ya está {estado}."
+    monto = float(monto)
+    px = float(get_quote(ticker)["price"])
+    if px <= 0:
+        return False, f"Sin precio para {ticker}."
+    hoy = str(date.today())
+    hs = _holdings_map(cid)
+    capital = get_capital(cid)
+    invertido = sum(h.get("invested") or 0.0 for h in hs.values())
+    efectivo = max(capital - invertido, 0.0)
+
+    if side == "compra":
+        if monto > efectivo + 0.01:
+            return False, (f"Efectivo insuficiente: tiene ${efectivo:,.0f} y "
+                           f"pide ${monto:,.0f}. Registra un depósito primero.")
+        h = hs.get(ticker)
+        if h:
+            old_inv = h.get("invested") or 0.0
+            old_units = old_inv / h["price_at"] if h["price_at"] else 0.0
+            new_units = old_units + monto / px
+            new_inv = old_inv + monto
+            new_px = new_inv / new_units if new_units else px
+            execute("UPDATE holdings SET invested=?, price_at=?, assigned=? "
+                    "WHERE client_id=? AND ticker=?",
+                    (new_inv, new_px, hoy, cid, ticker))
+        else:
+            execute("INSERT INTO holdings VALUES (?,?,?,?,?,?)",
+                    (cid, ticker, 0.0, px, hoy, monto))
+        execute("INSERT INTO movements VALUES (?,?,?,?,?)",
+                (cid, hoy, "Compra", monto, f"{ticker} @ ${px:,.2f} (orden aprobada)"))
+    else:                                                   # venta
+        h = hs.get(ticker)
+        if not h:
+            return False, f"El cliente no tiene {ticker}."
+        inv = h.get("invested") or 0.0
+        units = inv / h["price_at"] if h["price_at"] else 0.0
+        pos_value = units * px
+        if monto > pos_value + 0.01:
+            return False, (f"Posición insuficiente: {ticker} vale "
+                           f"${pos_value:,.0f} y pide vender ${monto:,.0f}.")
+        units_sold = monto / px
+        inv_sold = units_sold * h["price_at"]
+        realized = monto - inv_sold                         # G/P realizada → efectivo
+        rest = inv - inv_sold
+        if rest < 1.0:
+            execute("DELETE FROM holdings WHERE client_id=? AND ticker=?",
+                    (cid, ticker))
+        else:
+            execute("UPDATE holdings SET invested=? WHERE client_id=? AND ticker=?",
+                    (rest, cid, ticker))
+        execute_many([
+            ("UPDATE clients SET capital = capital + ? WHERE id=?",
+             (float(realized), cid)),
+            ("INSERT INTO movements VALUES (?,?,?,?,?)",
+             (cid, hoy, "Venta", monto,
+              f"{ticker} @ ${px:,.2f} · G/P realizada ${realized:+,.2f}")),
+        ])
+    execute("UPDATE orders SET estado='aprobada' WHERE id=?", (order_id,))
+    _reweigh(cid)
+    lado = "Compra" if side == "compra" else "Venta"
+    return True, f"{lado} de {ticker} por ${monto:,.0f} ejecutada @ ${px:,.2f}."
+
+
+# ------------------------------------------ v0.16: simulador (paper) ----
+PAPER_INICIAL = 100_000.0
+
+
+def paper_state(cid: str) -> dict:
+    """Cartera de práctica: efectivo virtual + posiciones."""
+    cid = cid.upper()
+    rows = query("SELECT cash FROM paper_cash WHERE client_id=?", (cid,))
+    if not rows:
+        execute("INSERT INTO paper_cash VALUES (?,?)", (cid, PAPER_INICIAL))
+        cash = PAPER_INICIAL
+    else:
+        cash = float(rows[0][0])
+    pos = query("SELECT ticker, units, price_at, date FROM paper "
+                "WHERE client_id=? ORDER BY ticker", (cid,))
+    return {"cash": cash,
+            "positions": [{"ticker": r[0], "units": r[1],
+                           "price_at": r[2], "date": r[3]} for r in pos]}
+
+
+def paper_trade(cid: str, side: str, ticker: str, monto: float) -> tuple[bool, str]:
+    """Compra/venta INSTANTÁNEA con dinero ficticio a precio real."""
+    from src.data.market_data import get_quote
+    cid, ticker = cid.upper(), ticker.upper()
+    st_ = paper_state(cid)
+    px = float(get_quote(ticker)["price"])
+    if px <= 0:
+        return False, f"Sin precio para {ticker}."
+    monto = float(monto)
+    pos = {p["ticker"]: p for p in st_["positions"]}
+    if side == "compra":
+        if monto > st_["cash"] + 0.01:
+            return False, f"Efectivo virtual insuficiente (${st_['cash']:,.0f})."
+        units = monto / px
+        if ticker in pos:
+            p = pos[ticker]
+            nu = p["units"] + units
+            npx = (p["units"] * p["price_at"] + monto) / nu
+            execute("UPDATE paper SET units=?, price_at=? "
+                    "WHERE client_id=? AND ticker=?", (nu, npx, cid, ticker))
+        else:
+            execute("INSERT INTO paper VALUES (?,?,?,?,?)",
+                    (cid, ticker, units, px, str(date.today())))
+        execute("UPDATE paper_cash SET cash = cash - ? WHERE client_id=?",
+                (monto, cid))
+        return True, f"Compraste {units:.3f} de {ticker} @ ${px:,.2f} (práctica)."
+    p = pos.get(ticker)
+    if not p:
+        return False, f"No tienes {ticker} en tu cartera de práctica."
+    pos_value = p["units"] * px
+    monto = min(monto, pos_value)
+    units_sold = monto / px
+    rest = p["units"] - units_sold
+    if rest * px < 1.0:
+        execute("DELETE FROM paper WHERE client_id=? AND ticker=?", (cid, ticker))
+    else:
+        execute("UPDATE paper SET units=? WHERE client_id=? AND ticker=?",
+                (rest, cid, ticker))
+    execute("UPDATE paper_cash SET cash = cash + ? WHERE client_id=?", (monto, cid))
+    return True, f"Vendiste {units_sold:.3f} de {ticker} @ ${px:,.2f} (práctica)."
+
+
+def paper_reset(cid: str) -> None:
+    execute_many([
+        ("DELETE FROM paper WHERE client_id=?", (cid.upper(),)),
+        ("INSERT OR REPLACE INTO paper_cash VALUES (?,?)",
+         (cid.upper(), PAPER_INICIAL)),
+    ])

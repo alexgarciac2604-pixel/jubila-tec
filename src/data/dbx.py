@@ -33,6 +33,14 @@ _SCHEMA = (
         mensaje TEXT, estado TEXT)""",
     """CREATE TABLE IF NOT EXISTS notes (
         client_id TEXT PRIMARY KEY, nota TEXT, updated TEXT)""",
+    """CREATE TABLE IF NOT EXISTS orders (
+        id TEXT PRIMARY KEY, client_id TEXT, date TEXT, side TEXT,
+        ticker TEXT, monto REAL, estado TEXT, nota TEXT)""",
+    """CREATE TABLE IF NOT EXISTS paper (
+        client_id TEXT, ticker TEXT, units REAL, price_at REAL, date TEXT,
+        PRIMARY KEY (client_id, ticker))""",
+    """CREATE TABLE IF NOT EXISTS paper_cash (
+        client_id TEXT PRIMARY KEY, cash REAL)""",
 )
 
 # columnas agregadas después del primer despliegue (fallan si ya existen: ok)

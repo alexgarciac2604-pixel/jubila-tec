@@ -257,16 +257,11 @@ def _reweigh(cid: str) -> None:
     ])
 
 
-def approve_order(order_id: str) -> tuple[bool, str]:
-    """Ejecuta la orden a precio actual. (ok, mensaje)."""
+def _execute_trade(cid: str, side: str, ticker: str,
+                   monto: float) -> tuple[bool, str]:
+    """Núcleo de ejecución a precio actual, con matemática de efectivo."""
     from src.data.market_data import get_quote
-    rows = query("SELECT client_id, side, ticker, monto, estado FROM orders "
-                 "WHERE id=?", (order_id,))
-    if not rows:
-        return False, "Orden no encontrada."
-    cid, side, ticker, monto, estado = rows[0]
-    if estado != "pendiente":
-        return False, f"La orden ya está {estado}."
+    cid, ticker = cid.upper(), ticker.upper()
     monto = float(monto)
     px = float(get_quote(ticker)["price"])
     if px <= 0:
@@ -323,10 +318,37 @@ def approve_order(order_id: str) -> tuple[bool, str]:
              (cid, hoy, "Venta", monto,
               f"{ticker} @ ${px:,.2f} · G/P realizada ${realized:+,.2f}")),
         ])
-    execute("UPDATE orders SET estado='aprobada' WHERE id=?", (order_id,))
     _reweigh(cid)
     lado = "Compra" if side == "compra" else "Venta"
     return True, f"{lado} de {ticker} por ${monto:,.0f} ejecutada @ ${px:,.2f}."
+
+
+def approve_order(order_id: str) -> tuple[bool, str]:
+    """Flujo con aprobación (órdenes pendientes heredadas)."""
+    rows = query("SELECT client_id, side, ticker, monto, estado FROM orders "
+                 "WHERE id=?", (order_id,))
+    if not rows:
+        return False, "Orden no encontrada."
+    cid, side, ticker, monto, estado = rows[0]
+    if estado != "pendiente":
+        return False, f"La orden ya está {estado}."
+    ok, msg = _execute_trade(cid, side, ticker, float(monto))
+    if ok:
+        execute("UPDATE orders SET estado='aprobada' WHERE id=?", (order_id,))
+    return ok, msg
+
+
+def execute_order(cid: str, side: str, ticker: str, monto: float,
+                  nota: str = "") -> tuple[bool, str]:
+    """v0.17: el cliente ejecuta directo. Queda registrada como 'ejecutada'
+    para la auditoría del asesor en el Studio."""
+    ok, msg = _execute_trade(cid, side, ticker, monto)
+    if ok:
+        import uuid
+        execute("INSERT INTO orders VALUES (?,?,?,?,?,?,?,?)",
+                (uuid.uuid4().hex[:12], cid.upper(), str(date.today()),
+                 side, ticker.upper(), float(monto), "ejecutada", nota[:400]))
+    return ok, msg
 
 
 # ------------------------------------------ v0.16: simulador (paper) ----

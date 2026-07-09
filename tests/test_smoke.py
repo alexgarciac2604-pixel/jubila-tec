@@ -560,3 +560,24 @@ def test_v016_ordenes_y_practica():
     assert ps["cash"] == 100_000 and ps["positions"] == []
 
     cm.delete_client("C-016")
+
+
+def test_v017_ejecucion_directa():
+    """El cliente ejecuta directo; queda auditada como 'ejecutada'."""
+    from src.clients import manager as cm
+    for c in cm.list_clients():
+        cm.delete_client(c["id"])
+    assert cm.create_client("C-017", "Mia Solis", "8642", "agresivo", 30_000)
+
+    ok, msg = cm.execute_order("C-017", "compra", "NVDA", 12_000, "Score 80")
+    assert ok and "ejecutada" in msg.lower()
+    assert cm.get_portfolio("C-017")[0]["invested"] == 12_000
+    assert cm.get_orders("C-017")[0]["estado"] == "ejecutada"
+
+    ok, msg = cm.execute_order("C-017", "compra", "NVDA", 25_000, "")
+    assert not ok and "insuficiente" in msg          # 18k de efectivo, pide 25k
+    assert len(cm.get_orders("C-017")) == 1          # el fallo NO se registra
+
+    ok, _ = cm.execute_order("C-017", "venta", "NVDA", 2_000, "")
+    assert ok and abs(cm.get_portfolio("C-017")[0]["invested"] - 10_000) < 1.0
+    cm.delete_client("C-017")

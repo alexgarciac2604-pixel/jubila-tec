@@ -15,7 +15,7 @@ import streamlit as st
 
 from src.clients.manager import (add_deposit, approve_order, close_request,
                                  create_client, create_order, create_request,
-                                 delete_client, export_all, get_capital,
+                                 delete_client, execute_order, export_all, get_capital,
                                  get_movements, get_note, get_orders,
                                  get_portfolio, get_requests, import_all,
                                  list_clients, paper_reset, paper_state,
@@ -109,6 +109,31 @@ def _semaforo(score) -> tuple[str, str]:
     if score >= 45:
         return "🟡", "aceptable"
     return "🔴", "débil"
+
+
+def _veredicto(row: dict | None) -> tuple[str, str]:
+    """(titular, razón) en lenguaje simple — el 'por qué' de la oportunidad."""
+    if not row:
+        return ("🟡 Sin análisis nocturno",
+                "Esta empresa no está en nuestro screener de hoy. Puedes operar, "
+                "pero te sugerimos consultarlo con tu asesor.")
+    sc, dd = row.get("score", 50), row.get("desde_max_pct", 0) or 0
+    if sc >= 70 and dd <= -15:
+        return ("🟢 Posible oportunidad",
+                f"empresa sólida que el mercado castigó: cotiza {abs(dd):.0f}% "
+                "debajo de su máximo del año con fundamentos de calidad. "
+                "Comprar calidad con descuento es la receta clásica.")
+    if sc >= 70:
+        return ("🟢 Empresa sólida",
+                "buenos fundamentos y precio razonable según nuestro análisis "
+                "de hoy. Apta para acumular con horizonte largo.")
+    if sc >= 45:
+        return ("🟡 Aceptable, sin prisa",
+                "no destaca hoy: ni barata ni con gran impulso. Si te gusta, "
+                "considera entrar por partes o esperar mejor punto.")
+    return ("🔴 Cautela",
+            "nuestro análisis de hoy no la favorece (fundamentos o precio "
+            "flojos). No la recomendamos en este momento.")
 
 
 def _por_que(ticker: str, sector: str, row: dict | None) -> str:
@@ -394,47 +419,78 @@ def _client_panel(client: dict) -> None:
 
     # ------------------------------------------------------------- Invertir --
     elif nav == _NAV[2]:
-        st.markdown("**🛒 Envía una orden a tu asesor**")
-        st.caption("Tu asesor revisa cada orden con el análisis de AL-X y la "
-                   "ejecuta si procede. Verás el resultado en Movimientos.")
+        st.markdown("**🛒 Invertir**")
+        st.caption("Ejecutas al precio actual del mercado y queda registrado al "
+                   "instante. Los depósitos y retiros de dinero real se "
+                   "coordinan con tu asesor.")
         from src.screener.engine import load_screener
         scr = load_screener()
         scr_map = ({r["ticker"]: r for r in scr["rows"]}
                    if scr and scr.get("rows") else {})
         universo = sorted(set(DEFAULT_UNIVERSE)
                           | {h["ticker"] for h in holdings})
-        with st.form("orden"):
-            c1, c2, c3 = st.columns([1, 1.4, 1])
-            side = c1.radio("Operación", ["compra", "venta"],
-                            format_func=str.capitalize, horizontal=True)
-            tk = c2.selectbox("Empresa", universo)
-            monto = c3.number_input("Monto ($)", 100.0, 1e8, 5_000.0,
-                                    step=500.0)
-            row = scr_map.get(tk)
-            if row:
-                emoji, calif = _semaforo(row.get("score", 50))
-                st.caption(f"Análisis AL-X de {tk}: **{calif} "
-                           f"{row.get('score', '—')}/100 {emoji}** · "
-                           f"precio ${row.get('price', 0):,.2f} · "
-                           f"sector {row.get('sector', '—')}")
-            if st.form_submit_button("Enviar orden al asesor", type="primary"):
-                analisis = (f"Score AL-X {row.get('score', '—')}/100"
-                            if row else "sin análisis nocturno")
-                create_order(client["id"], side, tk, monto, analisis)
-                st.success(f"✅ Orden de {side} de {tk} por ${monto:,.0f} "
-                           "enviada. Tu asesor la revisará.")
-        st.caption(f"💵 Efectivo disponible: {fmt_money(efectivo)} — las compras "
-                   "se descuentan de ahí cuando tu asesor las aprueba.")
+        c1, c2 = st.columns([1.6, 1])
+        tk = c1.selectbox("Empresa", universo, key="inv_tk")
+        side = c2.radio("Operación", ["compra", "venta"], horizontal=True,
+                        format_func=str.capitalize, key="inv_side")
+
+        # --- análisis AL-X en vivo de la empresa elegida -------------------
+        row = scr_map.get(tk)
+        titular, razon = _veredicto(row)
+        try:
+            q = get_quote(tk)
+            precio_txt = (f"${q['price']:,.2f} "
+                          f"<span style='{_tint(q['change_pct'])}'>"
+                          f"{q['change_pct']:+.2f}% hoy</span> · "
+                          f"{q['from_52w_high_pct']:+.0f}% desde su máximo de 52s")
+        except Exception:
+            precio_txt = ""
+        pilares = ""
+        if row:
+            pilares = (f"<br><small>Calidad {row.get('calidad', '—')} · "
+                       f"Técnico {row.get('tecnico', '—')} · "
+                       f"Valoración {row.get('valoracion', '—')} → "
+                       f"<b>Score {row.get('score', '—')}/100</b></small>")
+        try:
+            from src.models.regime import market_regime
+            reg = market_regime()
+            mercado = (f"<br><small>{reg['emoji']} Contexto: mercado en "
+                       f"<b>{reg['name']}</b> (prob. de turbulencia "
+                       f"{reg['p_turbulent']:.0%}).</small>")
+        except Exception:
+            mercado = ""
+        st.markdown(
+            f"<div class='alx-note'><b>{tk}</b> — {precio_txt}<br>"
+            f"<b>{titular}</b>: {razon}{pilares}{mercado}</div>",
+            unsafe_allow_html=True)
+
+        monto = st.number_input("Monto ($)", 100.0, 1e8, 5_000.0, step=500.0,
+                                key="inv_monto")
+        adelante = True
+        if row and row.get("score", 50) < 45 and side == "compra":
+            adelante = st.checkbox("Entiendo que el análisis de hoy sugiere "
+                                   "cautela y quiero comprar de todos modos.")
+        if st.button(f"⚡ Ejecutar {side} ahora", type="primary",
+                     disabled=not adelante):
+            nota = (f"Score AL-X {row.get('score', '—')}/100 · {titular}"
+                    if row else "sin análisis nocturno")
+            ok, msg = execute_order(client["id"], side, tk, monto, nota)
+            (st.success if ok else st.error)(msg)
+            if ok:
+                st.rerun()
+        st.caption(f"💵 Efectivo disponible: {fmt_money(efectivo)}. "
+                   "⚖️ Registro informativo: la app no custodia dinero ni valores.")
+
         ords = get_orders(client["id"])
         if ords:
-            st.markdown("**Tus órdenes**")
-            iconos = {"pendiente": "🟡", "aprobada": "✅", "rechazada": "🔴"}
+            st.markdown("**Tus operaciones recientes**")
+            iconos = {"pendiente": "🟡", "aprobada": "✅",
+                      "ejecutada": "⚡", "rechazada": "🔴"}
             for o in ords[:10]:
                 st.markdown(
                     f"{iconos.get(o['estado'], '·')} *{o['date']}* — "
                     f"{o['side'].capitalize()} **{o['ticker']}** "
-                    f"${o['monto']:,.0f} · {o['estado']}"
-                    + (f" — {o['nota']}" if o["estado"] == "rechazada" else ""))
+                    f"${o['monto']:,.0f} · {o['estado']}")
 
     # ------------------------------------------------------------- Práctica --
     elif nav == _NAV[3]:
@@ -615,11 +671,20 @@ def _admin_panel() -> None:
                      "Revisa que TURSO_DATABASE_URL empiece con libsql:// y que el "
                      "token sea el de ESTA base (crea uno nuevo si hace falta).")
 
-    ord_pend = [o for o in get_orders() if o["estado"] == "pendiente"]
-    with st.expander(f"🛒 Órdenes de clientes ({len(ord_pend)} pendientes)",
+    todas = get_orders()
+    ord_pend = [o for o in todas if o["estado"] == "pendiente"]
+    with st.expander(f"🛒 Operaciones de clientes ({len(ord_pend)} por aprobar)",
                      expanded=bool(ord_pend)):
+        ejecutadas = [o for o in todas if o["estado"] == "ejecutada"][:8]
+        if ejecutadas:
+            st.markdown("**⚡ Ejecutadas por los clientes (auditoría)**")
+            for o in ejecutadas:
+                st.markdown(f"⚡ **{o['client_id']}** · *{o['date']}* — "
+                            f"{o['side'].capitalize()} **{o['ticker']}** "
+                            f"${o['monto']:,.0f} · {o['nota']}")
+            st.divider()
         if not ord_pend:
-            st.caption("Sin órdenes pendientes.")
+            st.caption("Sin órdenes pendientes de aprobación.")
         for o in ord_pend:
             c1, c2, c3 = st.columns([4, 1, 1])
             c1.markdown(f"**{o['client_id']}** · *{o['date']}* — "

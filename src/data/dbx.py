@@ -24,9 +24,19 @@ _SCHEMA = (
         perfil TEXT, capital REAL, created TEXT)""",
     """CREATE TABLE IF NOT EXISTS holdings (
         client_id TEXT, ticker TEXT, weight REAL,
-        price_at REAL, assigned TEXT,
+        price_at REAL, assigned TEXT, invested REAL,
         PRIMARY KEY (client_id, ticker))""",
+    """CREATE TABLE IF NOT EXISTS movements (
+        client_id TEXT, date TEXT, tipo TEXT, monto REAL, nota TEXT)""",
+    """CREATE TABLE IF NOT EXISTS requests (
+        id TEXT PRIMARY KEY, client_id TEXT, date TEXT,
+        mensaje TEXT, estado TEXT)""",
+    """CREATE TABLE IF NOT EXISTS notes (
+        client_id TEXT PRIMARY KEY, nota TEXT, updated TEXT)""",
 )
+
+# columnas agregadas después del primer despliegue (fallan si ya existen: ok)
+_MIGRATIONS = ("ALTER TABLE holdings ADD COLUMN invested REAL",)
 
 
 def _turso_creds() -> tuple[str, str] | None:
@@ -53,6 +63,11 @@ def _sqlite_conn() -> sqlite3.Connection:
     con = sqlite3.connect(_db_path())
     for ddl in _SCHEMA:
         con.execute(ddl)
+    for mig in _MIGRATIONS:
+        try:
+            con.execute(mig)
+        except sqlite3.OperationalError:
+            pass
     return con
 
 
@@ -110,6 +125,11 @@ def _turso_run(stmts: list[tuple[str, tuple]]) -> list[list[tuple]]:
     global _TURSO_READY
     if not _TURSO_READY:
         _turso_pipeline([(ddl, ()) for ddl in _SCHEMA])
+        for mig in _MIGRATIONS:
+            try:
+                _turso_pipeline([(mig, ())])
+            except Exception:
+                pass                      # la columna ya existe
         _TURSO_READY = True
     return _turso_pipeline(stmts)
 

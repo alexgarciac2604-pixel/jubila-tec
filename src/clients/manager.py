@@ -32,9 +32,14 @@ def create_client(cid: str, name: str, pin: str, perfil: str = "moderado",
     cid = cid.strip().upper()
     if query("SELECT id FROM clients WHERE id=?", (cid,)):
         return False
-    execute("INSERT INTO clients VALUES (?,?,?,?,?,?)",
-            (cid, name.strip(), _hash_pin(cid, pin),
-             perfil, float(capital), str(date.today())))
+    execute_many([
+        ("INSERT INTO clients VALUES (?,?,?,?,?,?)",
+         (cid, name.strip(), _hash_pin(cid, pin),
+          perfil, float(capital), str(date.today()))),
+        ("INSERT INTO movements VALUES (?,?,?,?,?)",
+         (cid, str(date.today()), "Depósito inicial", float(capital),
+          "Apertura de cuenta")),
+    ])
     return True
 
 
@@ -79,25 +84,32 @@ def delete_client(cid: str) -> None:
 
 def set_portfolio(cid: str, tickers: list[str], weights: list[float],
                   prices: dict[str, float]) -> None:
-    """Asigna el portafolio congelando el precio de entrada de cada posición."""
+    """Asigna el portafolio congelando precio de entrada Y monto invertido
+    (así los depósitos posteriores no distorsionan el rendimiento)."""
     cid = cid.upper()
     hoy = str(date.today())
+    row = query("SELECT capital FROM clients WHERE id=?", (cid,))
+    capital = float(row[0][0]) if row else 0.0
     stmts: list[tuple[str, tuple]] = [("DELETE FROM holdings WHERE client_id=?", (cid,))]
     for t, w in zip(tickers, weights):
-        stmts.append(("INSERT INTO holdings VALUES (?,?,?,?,?)",
-                      (cid, t.upper(), float(w),
-                       float(prices.get(t.upper(), 0.0)), hoy)))
+        px = float(prices.get(t.upper(), 0.0))
+        inv = capital * float(w)
+        stmts.append(("INSERT INTO holdings VALUES (?,?,?,?,?,?)",
+                      (cid, t.upper(), float(w), px, hoy, inv)))
+        stmts.append(("INSERT INTO movements VALUES (?,?,?,?,?)",
+                      (cid, hoy, "Compra", inv,
+                       f"{t.upper()} · {float(w):.0%} @ ${px:,.2f}")))
     execute_many(stmts)
 
 
 def get_portfolio(cid: str) -> list[dict]:
     try:
         rows = query(
-            "SELECT ticker, weight, price_at, assigned FROM holdings "
+            "SELECT ticker, weight, price_at, assigned, invested FROM holdings "
             "WHERE client_id=? ORDER BY weight DESC", (cid.upper(),),
         )
         return [{"ticker": r[0], "weight": r[1], "price_at": r[2],
-                 "assigned": r[3]} for r in rows]
+                 "assigned": r[3], "invested": r[4]} for r in rows]
     except Exception:
         return []
 
@@ -117,7 +129,80 @@ def import_all(payload: str) -> int:
     for c in data.get("clients", []):
         stmts.append(("INSERT OR REPLACE INTO clients VALUES (?,?,?,?,?,?)", tuple(c)))
     for h in data.get("holdings", []):
-        stmts.append(("INSERT OR REPLACE INTO holdings VALUES (?,?,?,?,?)", tuple(h)))
+        stmts.append(("INSERT OR REPLACE INTO holdings VALUES (?,?,?,?,?,?)",
+                      tuple(h) + (None,) * (6 - len(h))))
     if stmts:
         execute_many(stmts)
     return len(data.get("clients", []))
+
+
+# --------------------------------------------------- v0.14: cuenta viva ----
+def add_deposit(cid: str, monto: float, nota: str = "") -> None:
+    """Depósito (monto > 0) o retiro (monto < 0): ajusta capital y lo registra."""
+    cid = cid.upper()
+    tipo = "Depósito" if monto >= 0 else "Retiro"
+    execute_many([
+        ("UPDATE clients SET capital = capital + ? WHERE id=?", (float(monto), cid)),
+        ("INSERT INTO movements VALUES (?,?,?,?,?)",
+         (cid, str(date.today()), tipo, float(monto), nota)),
+    ])
+
+
+def get_movements(cid: str, limit: int = 200) -> list[dict]:
+    try:
+        rows = query(
+            "SELECT date, tipo, monto, nota FROM movements WHERE client_id=? "
+            "ORDER BY date DESC, rowid DESC LIMIT ?", (cid.upper(), int(limit)),
+        )
+        return [{"date": r[0], "tipo": r[1], "monto": r[2], "nota": r[3]}
+                for r in rows]
+    except Exception:
+        return []
+
+
+def get_capital(cid: str) -> float:
+    """Capital vigente (los depósitos/retiros lo mueven; la sesión no lo ve)."""
+    try:
+        row = query("SELECT capital FROM clients WHERE id=?", (cid.upper(),))
+        return float(row[0][0]) if row else 0.0
+    except Exception:
+        return 0.0
+
+
+def create_request(cid: str, mensaje: str) -> None:
+    import uuid
+    execute("INSERT INTO requests VALUES (?,?,?,?,?)",
+            (uuid.uuid4().hex[:12], cid.upper(), str(date.today()),
+             mensaje.strip()[:800], "pendiente"))
+
+
+def get_requests(cid: str | None = None) -> list[dict]:
+    try:
+        if cid:
+            rows = query("SELECT id, client_id, date, mensaje, estado FROM requests "
+                         "WHERE client_id=? ORDER BY date DESC", (cid.upper(),))
+        else:
+            rows = query("SELECT id, client_id, date, mensaje, estado FROM requests "
+                         "ORDER BY estado DESC, date DESC")
+        return [{"id": r[0], "client_id": r[1], "date": r[2],
+                 "mensaje": r[3], "estado": r[4]} for r in rows]
+    except Exception:
+        return []
+
+
+def close_request(req_id: str) -> None:
+    execute("UPDATE requests SET estado='atendida' WHERE id=?", (req_id,))
+
+
+def set_note(cid: str, nota: str) -> None:
+    execute("INSERT OR REPLACE INTO notes VALUES (?,?,?)",
+            (cid.upper(), nota.strip()[:1500], str(date.today())))
+
+
+def get_note(cid: str) -> dict | None:
+    try:
+        rows = query("SELECT nota, updated FROM notes WHERE client_id=?",
+                     (cid.upper(),))
+        return {"nota": rows[0][0], "updated": rows[0][1]} if rows else None
+    except Exception:
+        return None

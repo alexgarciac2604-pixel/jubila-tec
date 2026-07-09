@@ -4,6 +4,9 @@
 Segunda app del mismo repo: SOLO login + panel del cliente. Sin terminal,
 sin administración. Desplegar en Streamlit Cloud con Main file = cliente.py.
 
+Diseño v0.14 — "private banking": fondo marfil, texto carbón, bordes de oro
+metálico sutil, acento verde bosque y CTAs de cristal líquido (liquid glass).
+
 Run local:  streamlit run cliente.py
 """
 from __future__ import annotations
@@ -19,15 +22,111 @@ st.set_page_config(
 
 from src.clients.manager import verify_client
 from src.config import get_secret
-from src.utils.styles import inject_css
 from src.views.clients_view import _client_panel
 
-inject_css()
-st.markdown(  # sin sidebar: esta app es solo para clientes
-    "<style>section[data-testid='stSidebar'], "
-    "div[data-testid='collapsedControl'] {display:none;}</style>",
-    unsafe_allow_html=True,
-)
+# --- tema marfil / carbón / oro (exclusivo del Portal) -----------------------
+_LUX_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
+
+/* lienzo marfil, texto carbón */
+.stApp { background: #FAF7F0; }
+html, body, [class*="css"] { font-family:'Inter',sans-serif; color:#1C1917; }
+h1 { font-family:'Playfair Display',serif !important; font-weight:700 !important;
+     letter-spacing:-0.02em; color:#1C1917 !important; }
+h2, h3 { font-weight:700 !important; letter-spacing:-0.01em; color:#1C1917 !important; }
+.block-container { padding-top:2rem; padding-bottom:3.5rem; max-width:1180px; }
+section[data-testid="stSidebar"], div[data-testid="collapsedControl"] { display:none; }
+
+/* tarjetas: marfil claro + borde dorado fino */
+div[data-testid="stMetric"] {
+  background:#FFFEFA;
+  border:1px solid rgba(198,167,94,.45);
+  border-radius:18px; padding:20px 24px;
+  box-shadow:0 1px 2px rgba(28,25,23,.04);
+  transition:box-shadow .25s ease, transform .25s ease;
+}
+div[data-testid="stMetric"]:hover {
+  box-shadow:0 10px 28px rgba(28,25,23,.08); transform:translateY(-1px);
+}
+div[data-testid="stMetric"] label { color:#78716C; font-weight:500; }
+
+/* CTA liquid glass: vidrio orgánico sobre verde bosque, borde de oro 1px */
+button[kind="primary"], div[data-testid="stFormSubmitButton"] > button {
+  position:relative; overflow:hidden;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.32) 0%, rgba(255,255,255,.07) 46%,
+                    rgba(0,0,0,.12) 100%), #1B4D3E !important;
+  color:#FFFFFF !important;
+  border:1px solid rgba(214,183,110,.9) !important;
+  border-radius:14px !important;
+  backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.38),
+             inset 0 -1px 0 rgba(0,0,0,.18),
+             0 6px 20px rgba(27,77,62,.20);
+  transition:all .22s ease;
+}
+button[kind="primary"]:hover, div[data-testid="stFormSubmitButton"] > button:hover {
+  transform:translateY(-1px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 10px 26px rgba(27,77,62,.30);
+  border-color:#D6B76E !important;
+}
+/* reflejo superior del cristal */
+button[kind="primary"]::before, div[data-testid="stFormSubmitButton"] > button::before {
+  content:""; position:absolute; top:0; left:6%; right:6%; height:46%;
+  background:linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0));
+  border-radius:12px 12px 40% 40%; pointer-events:none;
+}
+
+/* botones secundarios: cristal marfil con borde dorado, texto carbón */
+button[kind="secondary"] {
+  background:linear-gradient(180deg, rgba(255,255,255,.75), rgba(250,247,240,.4)) !important;
+  color:#1C1917 !important;
+  border:1px solid rgba(198,167,94,.55) !important; border-radius:12px !important;
+  backdrop-filter:blur(5px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+
+/* pestañas: acento verde bosque con subrayado dorado */
+button[data-baseweb="tab"] { font-weight:600; color:#78716C; }
+button[data-baseweb="tab"][aria-selected="true"] { color:#1B4D3E; }
+div[data-baseweb="tab-highlight"] { background-color:#C6A75E !important; }
+
+/* contenedores, expanders, inputs */
+div[data-testid="stExpander"] {
+  border:1px solid rgba(198,167,94,.4); border-radius:16px; background:#FFFEFA;
+}
+div[data-baseweb="input"], div[data-baseweb="textarea"] {
+  border-radius:12px;
+}
+
+/* badges dorados */
+.jt-badge {
+  display:inline-block; padding:4px 14px; border-radius:999px;
+  font-size:.78rem; font-weight:500; background:#FFFEFA; color:#57534E;
+  border:1px solid rgba(198,167,94,.55); margin-right:4px;
+}
+
+/* ticker tape sobre marfil */
+.jt-tape {
+  overflow:hidden; white-space:nowrap; background:#FFFEFA;
+  border-top:1px solid rgba(198,167,94,.35);
+  border-bottom:1px solid rgba(198,167,94,.35);
+  padding:8px 0; margin-bottom:12px;
+}
+.jt-tape-inner {
+  display:inline-block; animation:jt-scroll 45s linear infinite;
+  font-family:'Inter',monospace; font-size:.85rem; font-weight:500;
+}
+.jt-tape-inner span { margin:0 20px; color:#44403C; }
+.jt-up { color:#0E6B45 !important; font-weight:600; }
+.jt-down { color:#B42318 !important; font-weight:600; }
+@keyframes jt-scroll { 0% {transform:translateX(0);} 100% {transform:translateX(-50%);} }
+
+hr { border-color:rgba(198,167,94,.35); }
+</style>
+"""
+st.markdown(_LUX_CSS, unsafe_allow_html=True)
 
 MAX_INTENTOS = 5
 _contacto = get_secret("ALX_CONTACTO") or "tu asesor AL-X"
@@ -45,14 +144,16 @@ if "client_auth" in st.session_state:
     _footer()
     st.stop()
 
-# --- pantalla de acceso -----------------------------------------------------
+# --- pantalla de acceso -------------------------------------------------------
 _, centro, _ = st.columns([1, 1.3, 1])
 with centro:
     st.markdown(
-        "<div style='text-align:center;margin-top:8vh'>"
+        "<div style='text-align:center;margin-top:7vh'>"
         "<div style='font-family:Playfair Display,serif;font-weight:700;"
-        "font-size:3rem;letter-spacing:-0.02em'>AL·X</div>"
-        "<div style='color:#64748B;margin-bottom:2rem'>Portal privado de clientes</div>"
+        "font-size:3.2rem;letter-spacing:-0.02em;color:#1C1917'>AL·X</div>"
+        "<div style='width:64px;height:1px;background:#C6A75E;margin:14px auto'></div>"
+        "<div style='color:#78716C;margin-bottom:2rem;letter-spacing:.06em;"
+        "text-transform:uppercase;font-size:.8rem'>Portal privado de clientes</div>"
         "</div>",
         unsafe_allow_html=True,
     )

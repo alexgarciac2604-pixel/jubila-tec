@@ -453,9 +453,49 @@ def test_dbx_dual_layer():
         assert rows == [("AAPL", 77)]
         assert calls[0]["url"] == "https://alx-db-test.turso.io/v2/pipeline"
         assert calls[0]["headers"]["Authorization"] == "Bearer tok"
-        assert len(calls) == 2          # 1ª: esquema (una sola vez); 2ª: query
+        assert len(calls) == 3          # 1ª esquema + 2ª migraciones + 3ª query
         dbx.execute_many([("DELETE FROM watchlist WHERE ticker=?", ("A",)),
                           ("INSERT INTO watchlist VALUES (?,?)", ("A", "hoy"))])
-        assert len(calls) == 3          # lote de 2 escrituras = 1 sola llamada
+        assert len(calls) == 4          # lote de 2 escrituras = 1 sola llamada
     dbx._TURSO_READY = False            # no contaminar otros tests
     assert dbx.backend() == "sqlite"    # secrets fuera de scope → local otra vez
+
+
+def test_v014_cuenta_viva():
+    """Movimientos, depósitos, solicitudes y nota del asesor (Portal v0.14)."""
+    from src.clients import manager as cm
+    for c in cm.list_clients():
+        cm.delete_client(c["id"])
+    assert cm.create_client("C-014", "Ana Gómez", "2468", "conservador", 50_000)
+
+    # el alta registró el depósito inicial
+    movs = cm.get_movements("C-014")
+    assert movs and movs[-1]["tipo"] == "Depósito inicial" and movs[-1]["monto"] == 50_000
+
+    # asignar congela MONTO invertido; el depósito posterior no lo distorsiona
+    cm.set_portfolio("C-014", ["JNJ", "KO"], [0.6, 0.4],
+                     {"JNJ": 150.0, "KO": 60.0})
+    h = cm.get_portfolio("C-014")
+    assert {x["ticker"]: x["invested"] for x in h} == {"JNJ": 30_000.0, "KO": 20_000.0}
+    assert len(cm.get_movements("C-014")) == 3          # depósito + 2 compras
+
+    cm.add_deposit("C-014", 10_000, "aportación")
+    assert cm.get_capital("C-014") == 60_000            # capital creció
+    assert cm.get_portfolio("C-014")[0]["invested"] == 30_000.0  # invertido intacto
+    cm.add_deposit("C-014", -5_000, "retiro parcial")
+    assert cm.get_capital("C-014") == 55_000
+    tipos = [m["tipo"] for m in cm.get_movements("C-014")]
+    assert "Retiro" in tipos and "Depósito" in tipos
+
+    # solicitudes: crear → pendiente → atendida
+    cm.create_request("C-014", "Quiero un portafolio con más dividendos.")
+    reqs = cm.get_requests("C-014")
+    assert reqs and reqs[0]["estado"] == "pendiente"
+    cm.close_request(reqs[0]["id"])
+    assert cm.get_requests("C-014")[0]["estado"] == "atendida"
+
+    # nota del asesor
+    cm.set_note("C-014", "Mantén el rumbo; rebalanceamos en octubre.")
+    assert "rumbo" in cm.get_note("C-014")["nota"]
+
+    cm.delete_client("C-014")

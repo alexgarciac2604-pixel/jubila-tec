@@ -1,4 +1,10 @@
-# 🧭 JUBILA-TEC — Plan Maestro de Producto
+# 🧭 AL-X — Plan Maestro de Producto
+
+> **v0.12**: la plataforma se renombró de Jubila-Tec a **AL-X**. Arquitectura de
+> dos apps del mismo repo: `app.py` = **AL-X Studio** (asesor) y `cliente.py` =
+> **AL-X Portal de Clientes** (standalone, sin terminal). ⚠️ Pendiente crítico:
+> BD compartida (Turso/Supabase) para que ambas apps en la nube vean los mismos
+> clientes; hasta entonces, usar el Studio como app única o el portal en local.
 
 > Documento de trabajo permanente. Consolida la visión, arquitectura y backlog
 > priorizado acordados. Toda sesión de desarrollo parte de aquí.

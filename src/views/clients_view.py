@@ -98,6 +98,24 @@ def _client_panel(client: dict) -> None:
     except Exception:
         st.caption("Métricas de riesgo no disponibles en este momento.")
 
+    from datetime import date as _date
+    reporte = "\n".join(
+        [f"# ◆ AL-X — Estado de cuenta: {client['name']} ({client['id']})",
+         f"*Generado: {_date.today()} · Perfil: {client['perfil']} · "
+         f"Asignado: {holdings[0]['assigned']}*", "",
+         f"**Capital asignado:** {fmt_money(total_in)}  ",
+         f"**Valor hoy:** {fmt_money(total_now)} ({rend_total:+.1f}%)", "",
+         "| Activo | Peso | P. entrada | P. actual | Valor hoy | Rend. |",
+         "|---|---|---|---|---|---|"] +
+        [f"| {r['Ticker']} | {r['Peso']:.0%} | ${r['P. entrada']:.2f} | "
+         f"${r['P. actual']:.2f} | ${r['Valor hoy']:,.0f} | {r['Rend. %']:+.1f}% |"
+         for r in rows] +
+        ["", "> Reporte informativo y educativo con datos públicos; no constituye "
+         "asesoría de inversión ni garantiza rendimientos."]
+    )
+    st.download_button("📄 Descargar mi estado de cuenta", reporte,
+                       file_name=f"alx_{client['id']}_{_date.today()}.md")
+
     st.info("⚖️ Reporte informativo y educativo con datos públicos; no constituye "
             "asesoría de inversión ni garantiza rendimientos.")
 

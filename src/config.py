@@ -28,7 +28,7 @@ def get_secret(name: str) -> str:
 
 
 DISCLAIMER = (
-    "⚠️ Jubila-Tec ofrece análisis informativo y educativo con datos públicos. "
+    "⚠️ AL-X ofrece análisis informativo y educativo con datos públicos. "
     "No es asesoría financiera personalizada ni garantiza rendimientos. "
     "Cada modelo tiene supuestos y limitaciones (ver 📚 Modelos & Compliance)."
 )

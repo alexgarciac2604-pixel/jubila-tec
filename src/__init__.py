@@ -1,2 +1,2 @@
-"""Jubila-Tec Terminal — núcleo analítico (independiente de Streamlit)."""
-__version__ = "0.11.0"
+"""AL-X Studio — núcleo analítico (independiente de Streamlit)."""
+__version__ = "0.12.0"

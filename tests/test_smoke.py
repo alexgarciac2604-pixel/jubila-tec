@@ -286,7 +286,7 @@ def test_fase4_copilot():
 def test_fase4_briefing():
     from src.report.briefing import daily_briefing
     b = daily_briefing(["AAPL", "MSFT", "XOM"])
-    assert "Briefing Jubila-Tec" in b
+    assert "Briefing AL-X" in b
     assert any(w in b for w in ("calma", "turbulencia", "Calma", "Turbulencia"))
     assert "%" in b and len(b) > 200
     assert daily_briefing(["AAPL", "MSFT", "XOM"]) == b  # determinista con datos sample

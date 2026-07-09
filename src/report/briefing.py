@@ -30,7 +30,7 @@ def daily_briefing(watchlist: list[str] | None = None) -> str:
         alert_line = "🔕 Ninguna de tus alertas se ha disparado — nada requiere acción hoy."
 
     return (
-        f"**🌅 Briefing Jubila-Tec — {date.today():%d/%m/%Y}**\n\n"
+        f"**🌅 Briefing AL-X — {date.today():%d/%m/%Y}**\n\n"
         f"{reg['emoji']} El mercado está en **{reg['name'].lower()}**: {reg['description']} "
         f"La probabilidad de turbulencia reciente es {reg['p_turbulent']:.0%}. {curve}\n\n"
         f"En tu lista, lo mejor del día es **{best['ticker']}** ({best['change_pct']:+.2f}%) "

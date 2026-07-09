@@ -16,7 +16,7 @@ import unicodedata
 from src.config import TICKER_NAMES, get_secret
 
 _SYSTEM = (
-    "Eres el copiloto de Jubila-Tec, una terminal financiera educativa. "
+    "Eres el copiloto de AL-X, una terminal financiera educativa. "
     "Respondes en español claro y cálido, en 2-4 párrafos cortos. REGLAS DURAS: "
     "1) Usa EXCLUSIVAMENTE los números del CONTEXTO; jamás inventes ni recalcules cifras. "
     "2) Si el contexto no contiene lo necesario, dilo y sugiere qué vista de la app usar. "
@@ -200,7 +200,7 @@ def _rule_based(intent: dict, context: str) -> str:
                 "el universo crecerá en próximas versiones.")
 
     if kind == "greeting":
-        return ("¡Hola! 👋 Soy el copiloto de Jubila-Tec. Pregúntame por una empresa "
+        return ("¡Hola! 👋 Soy el copiloto de AL-X. Pregúntame por una empresa "
                 "(\"¿qué te parece apple?\"), por el mercado (\"¿cómo está el panorama?\"), "
                 "por tu portafolio o por tu plan de jubilación — y te lo explico en "
                 "sencillo, con los números reales de los motores.")

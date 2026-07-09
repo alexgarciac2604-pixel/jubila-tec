@@ -1,4 +1,4 @@
-# 📈 Jubila-Tec Terminal
+# ◆ AL-X — Plataforma de Inversión Inteligente
 
 Terminal financiera de nivel institucional **que cualquier persona entiende**.
 Análisis de acciones, portafolios, planificación de jubilación, backtesting

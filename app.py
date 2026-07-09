@@ -1,5 +1,5 @@
 """
-Jubila-Tec Terminal — institutional-grade equity & market analysis.
+AL-X Studio — institutional-grade equity & market analysis.
 
 Run:  streamlit run app.py
 
@@ -12,7 +12,7 @@ import streamlit as st
 
 # ---- page config MUST be the first Streamlit call -------------------------
 st.set_page_config(
-    page_title="Jubila-Tec Terminal",
+    page_title="AL-X Studio",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -55,9 +55,9 @@ PAGES = [
 # --- sidebar ---------------------------------------------------------------
 with st.sidebar:
     st.markdown(
-        "<div style='font-family:Playfair Display,serif;font-weight:700;font-size:1.45rem;letter-spacing:-0.02em'>Jubila·Tec</div>"
+        "<div style='font-family:Playfair Display,serif;font-weight:700;font-size:1.45rem;letter-spacing:-0.02em'>AL·X</div>"
         f"<div style='color:#64748B;font-size:.74rem;margin:-2px 0 1.2rem'>"
-        f"Terminal financiera · v{__version__}</div>",
+        f"Studio · v{__version__}</div>",
         unsafe_allow_html=True,
     )
 

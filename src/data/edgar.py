@@ -11,7 +11,7 @@ import numpy as np
 from src.data import sample_data as sd
 from src.utils.cache import ttl_cache
 
-_UA = {"User-Agent": "Jubila-Tec research (contacto: alexgarciac2604@gmail.com)"}
+_UA = {"User-Agent": "AL-X research (contacto: alexgarciac2604@gmail.com)"}
 
 # CIKs de los principales tickers del universo (best-effort; si uno falla,
 # el failover sintético cubre). Fuente: EDGAR company_tickers.json.
@@ -26,7 +26,7 @@ _CIK = {
     "GE": 40545, "LMT": 936468, "T": 732717, "VZ": 732712,
 }
 
-# tag XBRL (us-gaap) → clave estándar de Jubila-Tec
+# tag XBRL (us-gaap) → clave estándar de AL-X
 _TAGS = {
     "Revenues": "revenue",
     "RevenueFromContractWithCustomerExcludingAssessedTax": "revenue",

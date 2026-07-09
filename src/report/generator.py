@@ -12,7 +12,7 @@ def build_report(a: dict) -> str:
     """a = salida de scoring.composite.composite_score()."""
     v, r, t, fo = a["valuation"], a["risk"], a["technical"], a["forensic"]
     lines = [
-        f"# 📈 Jubila-Tec — Reporte: {a['name']} ({a['ticker']})",
+        f"# 📈 AL-X — Reporte: {a['name']} ({a['ticker']})",
         f"*Generado: {date.today()} · Motor v{__version__} · Fuente: {a['data_source']}*",
         "",
         f"## Score de inversión: {a['total']}/100 {a['semaforo']}",

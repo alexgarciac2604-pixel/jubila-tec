@@ -1,4 +1,4 @@
-"""Sistema de diseño Jubila-Tec — tema claro premium.
+"""Sistema de diseño AL-X — tema claro premium.
 
 Lenguaje visual: fondo blanco, aire generoso, esmeralda como acento,
 Inter para todo y Playfair Display solo para énfasis de títulos.

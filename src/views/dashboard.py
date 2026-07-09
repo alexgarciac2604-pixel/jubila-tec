@@ -14,7 +14,7 @@ def render() -> None:
     st.title("🌐 Dashboard global")
     if not st.session_state.get("onboarded"):
         with st.container(border=True):
-            st.markdown("### 👋 Bienvenido a Jubila-Tec — 3 pasos para empezar")
+            st.markdown("### 👋 Bienvenido a AL-X — 3 pasos para empezar")
             c1, c2, c3 = st.columns(3)
             c1.markdown("**1️⃣ Analiza una acción**\n\nEscribe un ticker en la "
                         "barra lateral (ej. AAPL) o pregúntale al 🤖 Copiloto "

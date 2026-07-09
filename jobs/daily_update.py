@@ -1,4 +1,4 @@
-"""Actualización diaria de Jubila-Tec.
+"""Actualización diaria de AL-X.
 
 Refresca los datos, recalcula el score de todo el universo (alimentando el
 historial en SQLite día a día), evalúa las alertas y envía el briefing a

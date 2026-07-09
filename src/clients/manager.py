@@ -491,3 +491,192 @@ def watch_list(cid: str) -> list[str]:
         return [r[0] for r in rows]
     except Exception:
         return []
+
+
+# ----------------------------------------- v0.19: meta con progreso ----
+def set_goal(cid: str, nombre: str, monto_meta: float,
+             aporte_mensual: float) -> None:
+    execute("INSERT OR REPLACE INTO goals VALUES (?,?,?,?,?)",
+            (cid.upper(), nombre.strip()[:60], float(monto_meta),
+             float(aporte_mensual), str(date.today())))
+
+
+def get_goal(cid: str) -> dict | None:
+    try:
+        rows = query("SELECT nombre, monto_meta, aporte_mensual, created "
+                     "FROM goals WHERE client_id=?", (cid.upper(),))
+        if not rows:
+            return None
+        return {"nombre": rows[0][0], "monto_meta": rows[0][1],
+                "aporte_mensual": rows[0][2], "created": rows[0][3]}
+    except Exception:
+        return None
+
+
+def delete_goal(cid: str) -> None:
+    execute("DELETE FROM goals WHERE client_id=?", (cid.upper(),))
+
+
+def goal_eta(saldo: float, meta: float, aporte_mensual: float,
+             rendimiento_anual: float = 0.07) -> int | None:
+    """Meses estimados para llegar a la meta (interés compuesto mensual)."""
+    if saldo >= meta:
+        return 0
+    r = rendimiento_anual / 12.0
+    s, meses = float(saldo), 0
+    while s < meta and meses < 720:
+        s = s * (1 + r) + aporte_mensual
+        meses += 1
+    return meses if meses < 720 else None
+
+
+# ------------------------------- v0.19: insignias (gamificar APRENDER) ----
+def badges(cid: str) -> list[dict]:
+    """Insignias por aprender y formar hábitos — nunca por operar mucho."""
+    cid = cid.upper()
+    ps = paper_state(cid)
+    pos = ps["positions"]
+    wl = watch_list(cid)
+    movs = get_movements(cid)
+    hold = get_portfolio(cid)
+    from datetime import date as _d
+    dias_pos = [( _d.today() - _d.fromisoformat(p["date"])).days
+                for p in pos if p.get("date")]
+    practica_activa = ps["cash"] < PAPER_INICIAL or bool(pos)
+    valor_practica = ps["cash"] + sum(
+        p["units"] * p["price_at"] for p in pos)   # a costo: sin red no miente
+    out = [
+        {"emoji": "🎓", "nombre": "Primer paso",
+         "desc": "Hiciste tu primera operación de práctica.",
+         "ganada": practica_activa},
+        {"emoji": "🧺", "nombre": "Diversificado",
+         "desc": "4+ posiciones distintas en tu cartera de práctica.",
+         "ganada": len(pos) >= 4},
+        {"emoji": "💎", "nombre": "Manos firmes",
+         "desc": "Mantuviste una posición de práctica 30+ días.",
+         "ganada": any(d >= 30 for d in dias_pos)},
+        {"emoji": "⭐", "nombre": "Observador",
+         "desc": "Sigues 3+ empresas en tu watchlist.",
+         "ganada": len(wl) >= 3},
+        {"emoji": "🎯", "nombre": "Con rumbo",
+         "desc": "Definiste tu meta financiera.",
+         "ganada": get_goal(cid) is not None},
+        {"emoji": "💰", "nombre": "Inversionista real",
+         "desc": "Tu primera posición con dinero real.",
+         "ganada": bool(hold)},
+        {"emoji": "🔁", "nombre": "Constante",
+         "desc": "3+ depósitos registrados: el hábito vence al mercado.",
+         "ganada": len([m for m in movs
+                        if m["tipo"].startswith("Depósito")]) >= 3},
+    ]
+    return out
+
+
+RETOS_SEMANALES = [
+    "Arma en Práctica una canasta de 4 sectores distintos y obsérvala 7 días.",
+    "Esta semana NO vendas nada en Práctica, pase lo que pase. Las manos "
+    "firmes ganan.",
+    "Sigue 3 empresas nuevas en tu watchlist y lee una noticia de cada una.",
+    "Compara tu cartera de práctica contra SPY: ¿le ganaste al mercado o "
+    "el mercado a ti?",
+    "Invierte en Práctica en una empresa 🔴 de score bajo y una 🟢 de score "
+    "alto con el mismo monto. Apunta cuál va mejor en 2 semanas.",
+    "Lee el veredicto de 5 empresas en Invertir sin comprar ninguna. "
+    "Entender antes de actuar.",
+]
+
+
+def reto_semana() -> str:
+    from datetime import date as _d
+    return RETOS_SEMANALES[_d.today().isocalendar()[1] % len(RETOS_SEMANALES)]
+
+
+# --------------------------- v0.19: alertas en español natural ----
+_ALERT_CONDS = {
+    "cae_dia": "si {t} cae {u:.0f}% o más en un día",
+    "sube_dia": "si {t} sube {u:.0f}% o más en un día",
+    "precio_bajo": "si {t} baja de ${u:,.2f}",
+    "precio_alto": "si {t} llega a ${u:,.2f}",
+}
+
+
+def parse_alert(texto: str) -> dict | None:
+    """'avísame si apple cae 5%' → {ticker, cond, umbral}. None si no entiende."""
+    import re
+    from src.data.market_data import resolve_symbol
+    t = (texto or "").strip().lower()
+    if not t:
+        return None
+    m = re.search(r"(?:si|cuando)\s+(.+?)\s+(cae|caiga|baje?|pierda|suba?|"
+                  r"gane|llegue a|toque|baja de|baje de)\s+\$?\s*([\d,.]+)\s*(%)?",
+                  t)
+    if not m:
+        return None
+    quien, verbo, num, pct = m.group(1), m.group(2), m.group(3), m.group(4)
+    tk = resolve_symbol(quien)
+    if not tk:
+        return None
+    try:
+        u = float(num.replace(",", ""))
+    except ValueError:
+        return None
+    sube = verbo.startswith(("sub", "gan")) or verbo in ("llegue a", "toque")
+    if pct:
+        cond = "sube_dia" if sube else "cae_dia"
+    else:
+        cond = "precio_alto" if sube else "precio_bajo"
+    return {"ticker": tk, "cond": cond, "umbral": u}
+
+
+def alert_text(a: dict) -> str:
+    return _ALERT_CONDS[a["cond"]].format(t=a["ticker"], u=a["umbral"])
+
+
+def create_alert(cid: str, ticker: str, cond: str, umbral: float) -> None:
+    import uuid
+    execute("INSERT INTO client_alerts VALUES (?,?,?,?,?,?,?,?)",
+            (uuid.uuid4().hex[:12], cid.upper(), ticker.upper(), cond,
+             float(umbral), "activa", str(date.today()), ""))
+
+
+def list_alerts(cid: str) -> list[dict]:
+    try:
+        rows = query("SELECT id, ticker, cond, umbral, estado, disparo "
+                     "FROM client_alerts WHERE client_id=? "
+                     "ORDER BY estado, created DESC", (cid.upper(),))
+        return [{"id": r[0], "ticker": r[1], "cond": r[2], "umbral": r[3],
+                 "estado": r[4], "disparo": r[5]} for r in rows]
+    except Exception:
+        return []
+
+
+def delete_alert(alert_id: str) -> None:
+    execute("DELETE FROM client_alerts WHERE id=?", (alert_id,))
+
+
+def check_alerts(cid: str) -> list[str]:
+    """Evalúa las alertas activas; devuelve los mensajes disparados."""
+    from src.data.market_data import get_quote
+    disparadas = []
+    for a in list_alerts(cid):
+        if a["estado"] != "activa":
+            continue
+        try:
+            q = get_quote(a["ticker"])
+        except Exception:
+            continue
+        hit, detalle = False, ""
+        if a["cond"] == "cae_dia" and q["change_pct"] <= -a["umbral"]:
+            hit, detalle = True, f"cayó {q['change_pct']:+.2f}% hoy"
+        elif a["cond"] == "sube_dia" and q["change_pct"] >= a["umbral"]:
+            hit, detalle = True, f"subió {q['change_pct']:+.2f}% hoy"
+        elif a["cond"] == "precio_bajo" and q["price"] <= a["umbral"]:
+            hit, detalle = True, f"cotiza en ${q['price']:,.2f}"
+        elif a["cond"] == "precio_alto" and q["price"] >= a["umbral"]:
+            hit, detalle = True, f"cotiza en ${q['price']:,.2f}"
+        if hit:
+            execute("UPDATE client_alerts SET estado='disparada', disparo=? "
+                    "WHERE id=?", (str(date.today()), a["id"]))
+            disparadas.append(f"🔔 {a['ticker']} {detalle} — tu alerta "
+                              f"({alert_text(a)}) se cumplió.")
+    return disparadas

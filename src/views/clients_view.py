@@ -24,6 +24,10 @@ from src.clients.manager import (add_deposit, approve_order, close_request,
                                  reject_order, set_note, set_portfolio,
                                  verify_client, watch_add, watch_list,
                                  watch_remove)
+from src.clients.manager import (alert_text, badges, check_alerts,
+                                 create_alert, delete_alert, delete_goal,
+                                 get_goal, goal_eta, list_alerts, parse_alert,
+                                 reto_semana, set_goal)
 from src.config import DEFAULT_UNIVERSE, RISK_FREE, get_secret
 from src.data.market_data import get_history, get_quote
 from src.models.risk import monte_carlo_paths
@@ -209,6 +213,11 @@ def _client_panel(client: dict) -> None:
             st.session_state.pop("client_auth", None)
             st.rerun()
 
+    if "alx_alertas_vistas" not in st.session_state:
+        for _msg in check_alerts(client["id"]):
+            st.toast(_msg, icon="🔔")
+        st.session_state["alx_alertas_vistas"] = True
+
     capital = get_capital(client["id"]) or float(client.get("capital") or 0.0)
     holdings = get_portfolio(client["id"])
 
@@ -275,6 +284,45 @@ def _client_panel(client: dict) -> None:
         if b2.button("✉️ Hablar con tu asesor", use_container_width=True):
             st.session_state["alx_goto"] = True
             st.rerun()
+
+        meta = get_goal(client["id"])
+        if meta:
+            avance = min(saldo / meta["monto_meta"], 1.0) if meta["monto_meta"] else 0
+            st.markdown(f"**🎯 {meta['nombre']}** — {fmt_money(saldo)} de "
+                        f"{fmt_money(meta['monto_meta'])} ({avance:.0%})")
+            st.progress(avance)
+            eta = goal_eta(saldo, meta["monto_meta"], meta["aporte_mensual"])
+            if eta == 0:
+                st.caption("🏆 ¡Meta alcanzada! Habla con tu asesor para "
+                           "definir la siguiente.")
+            elif eta:
+                st.caption(f"Aportando {fmt_money(meta['aporte_mensual'])}/mes "
+                           f"llegarías en ~{eta // 12} años y {eta % 12} meses "
+                           "(supuesto 7% anual — estimación, no promesa).")
+            with st.expander("Editar mi meta"):
+                gn = st.text_input("Nombre", value=meta["nombre"], key="g_n")
+                gm = st.number_input("Meta ($)", 1000.0, 1e9,
+                                     float(meta["monto_meta"]), key="g_m")
+                ga = st.number_input("Aporte mensual ($)", 0.0, 1e7,
+                                     float(meta["aporte_mensual"]), key="g_a")
+                cgg1, cgg2 = st.columns(2)
+                if cgg1.button("Guardar meta"):
+                    set_goal(client["id"], gn, gm, ga)
+                    st.rerun()
+                if cgg2.button("Borrar meta"):
+                    delete_goal(client["id"])
+                    st.rerun()
+        else:
+            with st.expander("🎯 Define tu meta (retiro, casa, libertad…)"):
+                gn = st.text_input("¿Para qué inviertes?",
+                                   placeholder="Mi retiro", key="g_n0")
+                gm = st.number_input("¿Cuánto necesitas? ($)", 1000.0, 1e9,
+                                     1_000_000.0, step=50_000.0, key="g_m0")
+                ga = st.number_input("¿Cuánto puedes aportar al mes? ($)",
+                                     0.0, 1e7, 2_000.0, step=500.0, key="g_a0")
+                if st.button("Crear mi meta", type="primary") and gn.strip():
+                    set_goal(client["id"], gn, gm, ga)
+                    st.rerun()
 
         if serie is not None:
             st.markdown("**📈 Evolución de tu portafolio**")
@@ -576,6 +624,18 @@ def _client_panel(client: dict) -> None:
         if st.button("🔄 Reiniciar mi cartera de práctica"):
             paper_reset(client["id"])
             st.rerun()
+        st.markdown("**🏅 Tus insignias** — se ganan aprendiendo, no operando")
+        bds = badges(client["id"])
+        bcols = st.columns(4)
+        for i, bd in enumerate(bds):
+            estilo = ("" if bd["ganada"]
+                      else "opacity:.38;filter:grayscale(1);")
+            bcols[i % 4].markdown(
+                f"<div class='alx-note' style='text-align:center;{estilo}'>"
+                f"<div style='font-size:1.6rem'>{bd['emoji']}</div>"
+                f"<b>{bd['nombre']}</b><br><small>{bd['desc']}</small></div>",
+                unsafe_allow_html=True)
+        st.markdown(f"**📌 Reto de la semana:** {reto_semana()}")
         st.caption("💡 Consejo: antes de invertir de verdad, practica aquí una "
                    "estrategia durante unas semanas y compárala con tu "
                    "portafolio real.")
@@ -639,6 +699,33 @@ def _client_panel(client: dict) -> None:
             quitar = st.selectbox("Dejar de seguir", ["—"] + wl, key="watch_rm")
             if quitar != "—":
                 watch_remove(client["id"], quitar)
+                st.rerun()
+        st.divider()
+        st.markdown("**🔔 Mis alertas** — escríbelas como se las dirías a "
+                    "un amigo")
+        frase = st.text_input("Alerta", placeholder="Avísame si Apple cae 5%",
+                              key="alx_alert_txt", label_visibility="collapsed")
+        if frase:
+            intento = parse_alert(frase)
+            if intento:
+                st.caption(f"Entendí: avisarte **{alert_text(intento)}** ✓")
+                if st.button("🔔 Crear alerta", type="primary"):
+                    create_alert(client["id"], intento["ticker"],
+                                 intento["cond"], intento["umbral"])
+                    st.success("Alerta creada. Te avisaré al entrar al portal.")
+                    st.rerun()
+            else:
+                st.caption("No entendí 🤔 — prueba: «avísame si Tesla cae 7%» "
+                           "o «avísame si Apple llega a $280».")
+        activas = list_alerts(client["id"])
+        for a in activas[:10]:
+            ic = "🟢" if a["estado"] == "activa" else "🔔"
+            ca1, ca2 = st.columns([5, 1])
+            ca1.caption(f"{ic} Avisarme {alert_text(a)}"
+                        + (f" — se cumplió el {a['disparo']}"
+                           if a["estado"] == "disparada" else ""))
+            if ca2.button("🗑️", key=f"dal_{a['id']}"):
+                delete_alert(a["id"])
                 st.rerun()
         st.divider()
 

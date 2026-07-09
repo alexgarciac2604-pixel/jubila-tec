@@ -623,3 +623,50 @@ def test_v018_canastas_y_watchlist():
 
     cm.delete_basket(bs[0]["id"])
     cm.delete_client("C-018")
+
+
+def test_v019_metas_insignias_alertas():
+    """Sprint B: meta con ETA, insignias de aprendizaje y alertas en español."""
+    from src.clients import manager as cm
+    for c in cm.list_clients():
+        cm.delete_client(c["id"])
+    assert cm.create_client("C-019", "Iris Vega", "1122", "moderado", 20_000)
+
+    # meta: guardar, leer, ETA compuesto razonable
+    cm.set_goal("C-019", "Mi retiro", 1_000_000, 5_000)
+    g = cm.get_goal("C-019")
+    assert g["nombre"] == "Mi retiro" and g["monto_meta"] == 1_000_000
+    eta = cm.goal_eta(20_000, 1_000_000, 5_000)
+    assert 100 < eta < 200                      # ~11-12 años con 7%
+    assert cm.goal_eta(2_000_000, 1_000_000, 0) == 0   # ya llegó
+    assert cm.goal_eta(0, 1_000_000, 0) is None        # sin aporte: nunca
+
+    # insignias: rumbo ganada; primer paso tras operar en práctica
+    bmap = {b["nombre"]: b["ganada"] for b in cm.badges("C-019")}
+    assert bmap["Con rumbo"] and not bmap["Primer paso"]
+    cm.paper_trade("C-019", "compra", "AAPL", 5_000)
+    bmap = {b["nombre"]: b["ganada"] for b in cm.badges("C-019")}
+    assert bmap["Primer paso"] and not bmap["Diversificado"]
+    assert isinstance(cm.reto_semana(), str) and len(cm.reto_semana()) > 20
+
+    # parser de español natural
+    a = cm.parse_alert("avísame si apple cae 5%")
+    assert a == {"ticker": "AAPL", "cond": "cae_dia", "umbral": 5.0}
+    a = cm.parse_alert("cuando tesla suba 10%")
+    assert a["ticker"] == "TSLA" and a["cond"] == "sube_dia"
+    a = cm.parse_alert("avísame si microsoft llegue a $500")
+    assert a["ticker"] == "MSFT" and a["cond"] == "precio_alto" and a["umbral"] == 500
+    a = cm.parse_alert("si nvidia baja de 100")
+    assert a["ticker"] == "NVDA" and a["cond"] == "precio_bajo"
+    assert cm.parse_alert("hola buenos días") is None
+
+    # ciclo: crear → disparo determinista → estado
+    cm.create_alert("C-019", "AAPL", "precio_bajo", 1e9)   # siempre cierto
+    cm.create_alert("C-019", "AAPL", "precio_alto", 1e9)   # nunca (sample)
+    msgs = cm.check_alerts("C-019")
+    assert len(msgs) == 1 and "AAPL" in msgs[0]
+    estados = sorted(x["estado"] for x in cm.list_alerts("C-019"))
+    assert estados == ["activa", "disparada"]
+    assert cm.check_alerts("C-019") == []                  # no re-dispara
+
+    cm.delete_client("C-019")

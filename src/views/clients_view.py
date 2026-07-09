@@ -124,6 +124,15 @@ def _admin_panel() -> None:
     st.subheader("🛠️ Administración de clientes")
     st.caption("⚖️ Herramienta de registro y reporte. El uso comercial con clientes "
                "puede requerir registro como asesor (CNBV/SEC).")
+    from src.data.dbx import backend, ping
+    if backend() == "turso":
+        ok, msg = ping()
+        if ok:
+            st.caption("☁️ Turso conectado — base compartida con el Portal.")
+        else:
+            st.error(f"☁️ Turso configurado pero SIN conexión: {msg}\n\n"
+                     "Revisa que TURSO_DATABASE_URL empiece con libsql:// y que el "
+                     "token sea el de ESTA base (crea uno nuevo si hace falta).")
 
     with st.expander("➕ Nuevo cliente"):
         c1, c2 = st.columns(2)
@@ -136,10 +145,14 @@ def _admin_panel() -> None:
         if st.button("Crear cliente", type="primary"):
             if not (cid and name and len(pin) >= 4):
                 st.error("Completa número, nombre y un PIN de al menos 4 dígitos.")
-            elif create_client(cid, name, pin, perfil, capital):
-                st.success(f"Cliente {name} ({cid.upper()}) creado.")
             else:
-                st.error("Ese número de cliente ya existe.")
+                try:
+                    if create_client(cid, name, pin, perfil, capital):
+                        st.success(f"Cliente {name} ({cid.upper()}) creado.")
+                    else:
+                        st.error("Ese número de cliente ya existe.")
+                except Exception as e:
+                    st.error(f"⚠️ La base de datos falló (no es un duplicado): {e}")
 
     clientes = list_clients()
     if not clientes:
@@ -184,8 +197,13 @@ def _admin_panel() -> None:
     if borrar != "—" and c3.button(f"🗑️ Confirmar borrar {borrar}"):
         delete_client(borrar)
         st.rerun()
-    st.caption("💾 En la nube la base se reinicia con cada redeploy diario: "
-               "respalda después de cambios y restaura al entrar.")
+    from src.data.dbx import backend
+    if backend() == "turso":
+        st.caption("☁️ Base Turso compartida: los datos persisten y el Portal "
+                   "los ve al instante. El respaldo JSON es tu red de seguridad.")
+    else:
+        st.caption("💾 Base local: en la nube se reinicia con cada redeploy; "
+                   "respalda después de cambios y restaura al entrar.")
 
 
 def render() -> None:

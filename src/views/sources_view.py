@@ -4,7 +4,7 @@ from __future__ import annotations
 import streamlit as st
 
 from src.config import get_settings
-from src.data.dbx import backend
+from src.data.dbx import backend, ping
 from src.data.market_data import using_sample
 
 
@@ -22,7 +22,8 @@ def render() -> None:
         ("Fundamentales 10-K + insiders", "SEC EDGAR", "🟢 activo (fallback 🧪)", "Sin clave; requiere internet."),
         ("Contratos gob.", "USAspending.gov", "🧩 planificado", "Fase 3 del Plan Maestro."),
         ("Base de datos (clientes, listas)", "Turso / SQLite",
-         "🟢 Turso — compartida en la nube" if backend() == "turso" else "🟡 SQLite local",
+         ("🟢 Turso — conectada" if ping()[0] else "🔴 Turso — ERROR (ver abajo)")
+         if backend() == "turso" else "🟡 SQLite local",
          "Agrega TURSO_DATABASE_URL y TURSO_AUTH_TOKEN en Secrets de AMBAS apps."),
     ]
     for name, provider, status, how in rows:
@@ -31,6 +32,11 @@ def render() -> None:
         c2.markdown(provider)
         c3.markdown(status)
         c4.caption(how)
+
+    if backend() == "turso":
+        ok, msg = ping()
+        if not ok:
+            st.error(f"Detalle del error Turso: {msg}")
 
     st.divider()
     st.markdown(

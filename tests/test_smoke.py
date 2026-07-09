@@ -431,8 +431,7 @@ def test_dbx_dual_layer():
     calls = []
 
     class _Resp:
-        def raise_for_status(self):
-            pass
+        status_code = 200
 
         def json(self):
             n = len(calls[-1]["json"]["requests"]) - 1  # sin contar el close

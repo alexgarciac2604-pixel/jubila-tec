@@ -95,7 +95,8 @@ def _turso_pipeline(stmts: list[tuple[str, tuple]]) -> list[list[tuple]]:
             for s, ps in stmts]
     r = requests.post(http, json={"requests": reqs + [{"type": "close"}]},
                       headers={"Authorization": f"Bearer {tok}"}, timeout=12)
-    r.raise_for_status()
+    if r.status_code != 200:
+        raise RuntimeError(f"Turso HTTP {r.status_code}: {r.text[:300]}")
     out: list[list[tuple]] = []
     for res in r.json()["results"][:len(stmts)]:
         if res.get("type") != "ok":
@@ -133,3 +134,12 @@ def execute_many(stmts: list[tuple[str, tuple]]) -> None:
     with _sqlite_conn() as con:
         for sql, params in stmts:
             con.execute(sql, params)
+
+
+def ping() -> tuple[bool, str]:
+    """Prueba real de conexión. (ok, mensaje) — el mensaje trae el error exacto."""
+    try:
+        query("SELECT 1")
+        return True, "conexión OK"
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"

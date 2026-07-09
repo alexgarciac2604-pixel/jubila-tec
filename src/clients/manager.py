@@ -27,17 +27,15 @@ def _hash_pin(cid: str, pin: str) -> str:
 
 def create_client(cid: str, name: str, pin: str, perfil: str = "moderado",
                   capital: float = 0.0) -> bool:
-    """False si el id ya existe (o la base no está disponible)."""
+    """False si el id ya existe. Lanza excepción si la base falla (el
+    llamador la muestra: un error de conexión NO es "cliente duplicado")."""
     cid = cid.strip().upper()
-    try:
-        if query("SELECT id FROM clients WHERE id=?", (cid,)):
-            return False
-        execute("INSERT INTO clients VALUES (?,?,?,?,?,?)",
-                (cid, name.strip(), _hash_pin(cid, pin),
-                 perfil, float(capital), str(date.today())))
-        return True
-    except Exception:
+    if query("SELECT id FROM clients WHERE id=?", (cid,)):
         return False
+    execute("INSERT INTO clients VALUES (?,?,?,?,?,?)",
+            (cid, name.strip(), _hash_pin(cid, pin),
+             perfil, float(capital), str(date.today())))
+    return True
 
 
 def verify_client(id_or_name: str, pin: str) -> dict | None:

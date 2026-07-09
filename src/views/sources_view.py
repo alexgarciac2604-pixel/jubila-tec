@@ -4,6 +4,7 @@ from __future__ import annotations
 import streamlit as st
 
 from src.config import get_settings
+from src.data.dbx import backend
 from src.data.market_data import using_sample
 
 
@@ -20,6 +21,9 @@ def render() -> None:
          "🟢 activo" if s.has_fred() else "🟡 fallback", "Agrega FRED_API_KEY en `.env` (gratis)."),
         ("Fundamentales 10-K + insiders", "SEC EDGAR", "🟢 activo (fallback 🧪)", "Sin clave; requiere internet."),
         ("Contratos gob.", "USAspending.gov", "🧩 planificado", "Fase 3 del Plan Maestro."),
+        ("Base de datos (clientes, listas)", "Turso / SQLite",
+         "🟢 Turso — compartida en la nube" if backend() == "turso" else "🟡 SQLite local",
+         "Agrega TURSO_DATABASE_URL y TURSO_AUTH_TOKEN en Secrets de AMBAS apps."),
     ]
     for name, provider, status, how in rows:
         c1, c2, c3, c4 = st.columns([2, 1.4, 1, 2.6])

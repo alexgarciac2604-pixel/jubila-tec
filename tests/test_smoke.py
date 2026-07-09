@@ -410,3 +410,53 @@ if __name__ == "__main__":
         fn()
         print(f"  ok {fn.__name__}")
     print("All smoke tests passed.")
+
+
+def test_dbx_dual_layer():
+    """Capa dual: codificación Hrana simétrica + routing a Turso con secrets."""
+    from unittest.mock import patch
+    from src.data import dbx
+
+    # 1) encode/decode simétricos (los enteros viajan como string en Hrana)
+    assert dbx._decode(dbx._encode(42)) == 42
+    assert dbx._decode(dbx._encode(3.14)) == 3.14
+    assert dbx._decode(dbx._encode("AAPL")) == "AAPL"
+    assert dbx._decode(dbx._encode(None)) is None
+    assert dbx._decode(dbx._encode(True)) == 1
+
+    # 2) sin secrets → SQLite local
+    assert dbx.backend() == "sqlite"
+
+    # 3) con secrets → llamadas HTTP al pipeline, filas decodificadas
+    calls = []
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            n = len(calls[-1]["json"]["requests"]) - 1  # sin contar el close
+            ok = {"type": "ok", "response": {"type": "execute", "result": {
+                "cols": [], "rows": [[{"type": "text", "value": "AAPL"},
+                                      {"type": "integer", "value": "77"}]]}}}
+            return {"results": [ok] * n}
+
+    def _post(url, json=None, headers=None, timeout=None):
+        calls.append({"url": url, "json": json, "headers": headers})
+        return _Resp()
+
+    env = {"TURSO_DATABASE_URL": "libsql://alx-db-test.turso.io",
+           "TURSO_AUTH_TOKEN": "tok"}
+    with patch.dict(os.environ, env), patch("requests.post", _post):
+        dbx._TURSO_READY = False
+        assert dbx.backend() == "turso"
+        rows = dbx.query("SELECT ticker, total FROM score_history")
+        assert rows == [("AAPL", 77)]
+        assert calls[0]["url"] == "https://alx-db-test.turso.io/v2/pipeline"
+        assert calls[0]["headers"]["Authorization"] == "Bearer tok"
+        assert len(calls) == 2          # 1ª: esquema (una sola vez); 2ª: query
+        dbx.execute_many([("DELETE FROM watchlist WHERE ticker=?", ("A",)),
+                          ("INSERT INTO watchlist VALUES (?,?)", ("A", "hoy"))])
+        assert len(calls) == 3          # lote de 2 escrituras = 1 sola llamada
+    dbx._TURSO_READY = False            # no contaminar otros tests
+    assert dbx.backend() == "sqlite"    # secrets fuera de scope → local otra vez

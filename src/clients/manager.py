@@ -419,3 +419,75 @@ def paper_reset(cid: str) -> None:
         ("INSERT OR REPLACE INTO paper_cash VALUES (?,?)",
          (cid.upper(), PAPER_INICIAL)),
     ])
+
+
+# --------------------------------- v0.18: canastas modelo del asesor ----
+def create_basket(name: str, tesis: str, tickers: list[str],
+                  weights: list[float]) -> None:
+    import uuid
+    execute("INSERT INTO baskets VALUES (?,?,?,?,?,?)",
+            (uuid.uuid4().hex[:12], name.strip()[:60], tesis.strip()[:400],
+             json.dumps([t.upper() for t in tickers]),
+             json.dumps([float(w) for w in weights]), str(date.today())))
+
+
+def list_baskets() -> list[dict]:
+    try:
+        rows = query("SELECT id, name, tesis, tickers, weights, created "
+                     "FROM baskets ORDER BY created DESC")
+        return [{"id": r[0], "name": r[1], "tesis": r[2],
+                 "tickers": json.loads(r[3]), "weights": json.loads(r[4]),
+                 "created": r[5]} for r in rows]
+    except Exception:
+        return []
+
+
+def delete_basket(basket_id: str) -> None:
+    execute("DELETE FROM baskets WHERE id=?", (basket_id,))
+
+
+def invest_basket(cid: str, basket_id: str, monto: float) -> tuple[bool, str]:
+    """Compra todos los componentes de la canasta según sus pesos."""
+    b = next((x for x in list_baskets() if x["id"] == basket_id), None)
+    if not b:
+        return False, "Canasta no encontrada."
+    cid = cid.upper()
+    hs = {h["ticker"]: h for h in get_portfolio(cid)}
+    invertido = sum(h.get("invested") or 0.0 for h in hs.values())
+    efectivo = max(get_capital(cid) - invertido, 0.0)
+    if monto > efectivo + 0.01:
+        return False, (f"Efectivo insuficiente: tienes ${efectivo:,.0f} y la "
+                       f"canasta pide ${monto:,.0f}.")
+    hechos = 0
+    for t, w in zip(b["tickers"], b["weights"]):
+        ok, _ = _execute_trade(cid, "compra", t, monto * w)
+        hechos += int(ok)
+    if not hechos:
+        return False, "No se pudo ejecutar ningún componente (¿sin precios?)."
+    import uuid
+    execute("INSERT INTO orders VALUES (?,?,?,?,?,?,?,?)",
+            (uuid.uuid4().hex[:12], cid, str(date.today()), "compra",
+             f"🧺 {b['name']}"[:20], float(monto), "ejecutada",
+             f"Canasta del asesor · {hechos}/{len(b['tickers'])} componentes"))
+    return True, (f"Invertiste ${monto:,.0f} en «{b['name']}» "
+                  f"({hechos} posiciones). Tu asesor armó esta canasta.")
+
+
+# ------------------------------------- v0.18: watchlist del cliente ----
+def watch_add(cid: str, ticker: str) -> None:
+    execute("INSERT OR IGNORE INTO client_watch VALUES (?,?,?)",
+            (cid.upper(), ticker.upper(), str(date.today())))
+
+
+def watch_remove(cid: str, ticker: str) -> None:
+    execute("DELETE FROM client_watch WHERE client_id=? AND ticker=?",
+            (cid.upper(), ticker.upper()))
+
+
+def watch_list(cid: str) -> list[str]:
+    try:
+        rows = query("SELECT ticker FROM client_watch WHERE client_id=? "
+                     "ORDER BY added, ticker", (cid.upper(),))
+        return [r[0] for r in rows]
+    except Exception:
+        return []

@@ -581,3 +581,45 @@ def test_v017_ejecucion_directa():
     ok, _ = cm.execute_order("C-017", "venta", "NVDA", 2_000, "")
     assert ok and abs(cm.get_portfolio("C-017")[0]["invested"] - 10_000) < 1.0
     cm.delete_client("C-017")
+
+
+def test_v018_canastas_y_watchlist():
+    """Canastas del asesor (inversión multi-componente) y watchlist del cliente."""
+    from src.clients import manager as cm
+    for c in cm.list_clients():
+        cm.delete_client(c["id"])
+    for b in cm.list_baskets():
+        cm.delete_basket(b["id"])
+    assert cm.create_client("C-018", "Sam Rio", "9753", "moderado", 40_000)
+
+    cm.create_basket("🛡️ Escudo", "Defensivas para dormir tranquilo",
+                     ["JNJ", "KO", "PG"], [1 / 3] * 3)
+    bs = cm.list_baskets()
+    assert len(bs) == 1 and bs[0]["name"] == "🛡️ Escudo"
+
+    ok, msg = cm.invest_basket("C-018", bs[0]["id"], 50_000)
+    assert not ok and "insuficiente" in msg              # 40k de efectivo
+
+    ok, msg = cm.invest_basket("C-018", bs[0]["id"], 9_000)
+    assert ok, msg
+    h = cm.get_portfolio("C-018")
+    assert len(h) == 3
+    assert abs(sum(x["invested"] for x in h) - 9_000) < 1.0
+    assert any(o["ticker"].startswith("🧺") for o in cm.get_orders("C-018"))
+
+    cm.watch_add("C-018", "NVDA")
+    cm.watch_add("C-018", "nvda")                        # dup case-insensitive
+    cm.watch_add("C-018", "AAPL")
+    assert cm.watch_list("C-018") == ["AAPL", "NVDA"]  # mismo día → alfabético
+    cm.watch_remove("C-018", "NVDA")
+    assert cm.watch_list("C-018") == ["AAPL"]
+
+    from src.report.briefing import client_briefing as _briefing_cliente
+    rows = [{"Ticker": "JNJ", "% Día": 1.2}, {"Ticker": "KO", "% Día": -1.5}]
+    b = _briefing_cliente(rows, 0.4, 160.0)
+    assert "JNJ" in b and "KO" in b and "+0.40%" in b
+    assert "portafolio" in b.lower()
+    assert _briefing_cliente([], 0.0, 0.0)               # sin posiciones no truena
+
+    cm.delete_basket(bs[0]["id"])
+    cm.delete_client("C-018")

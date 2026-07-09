@@ -14,19 +14,23 @@ import plotly.express as px
 import streamlit as st
 
 from src.clients.manager import (add_deposit, approve_order, close_request,
-                                 create_client, create_order, create_request,
-                                 delete_client, execute_order, export_all, get_capital,
+                                 create_basket, create_client, create_order,
+                                 create_request, delete_basket, delete_client,
+                                 execute_order, export_all, get_capital,
                                  get_movements, get_note, get_orders,
                                  get_portfolio, get_requests, import_all,
-                                 list_clients, paper_reset, paper_state,
-                                 paper_trade, reject_order, set_note,
-                                 set_portfolio, verify_client)
+                                 invest_basket, list_baskets, list_clients,
+                                 paper_reset, paper_state, paper_trade,
+                                 reject_order, set_note, set_portfolio,
+                                 verify_client, watch_add, watch_list,
+                                 watch_remove)
 from src.config import DEFAULT_UNIVERSE, RISK_FREE, get_secret
 from src.data.market_data import get_history, get_quote
 from src.models.risk import monte_carlo_paths
 from src.models.stress import portfolio_stress
 from src.portfolio import optimizer as opt
 from src.utils.formatting import fmt_money, fmt_num, fmt_pct
+from src.report.briefing import client_briefing as _briefing_cliente
 from src.views.components import dark_fig, render_ticker_tape
 
 _METHODS = {
@@ -257,6 +261,13 @@ def _client_panel(client: dict) -> None:
             unsafe_allow_html=True,
         )
 
+        dia_dinero = (serie.iloc[-1] - serie.iloc[-2]
+                      if serie is not None and len(serie) > 1 else 0.0)
+        st.markdown(
+            f"<div class='alx-note'>🌅 <b>¿Qué pasó con tu dinero?</b><br>"
+            f"{_briefing_cliente(rows, dia_pct, dia_dinero)}</div>",
+            unsafe_allow_html=True)
+
         b1, b2 = st.columns(2)
         if b1.button("💵 Solicitar depósito / retiro", use_container_width=True):
             st.session_state["alx_goto"] = True
@@ -423,6 +434,30 @@ def _client_panel(client: dict) -> None:
         st.caption("Ejecutas al precio actual del mercado y queda registrado al "
                    "instante. Los depósitos y retiros de dinero real se "
                    "coordinan con tu asesor.")
+        canastas = list_baskets()
+        if canastas:
+            st.markdown("**🧺 Canastas de tu asesor** — portafolios armados "
+                        "con una tesis, listos para invertir con un clic")
+            for b in canastas:
+                with st.container(border=True):
+                    comp = " · ".join(f"{t} {w:.0%}" for t, w in
+                                      zip(b["tickers"], b["weights"]))
+                    st.markdown(f"**{b['name']}**  \n{b['tesis']}  \n"
+                                f"<small style='color:#78716C'>{comp}</small>",
+                                unsafe_allow_html=True)
+                    cc1, cc2 = st.columns([1, 1])
+                    m_b = cc1.number_input("Monto ($)", 100.0, 1e8, 5_000.0,
+                                           step=500.0, key=f"bk_m_{b['id']}",
+                                           label_visibility="collapsed")
+                    if cc2.button(f"⚡ Invertir en esta canasta",
+                                  key=f"bk_{b['id']}", type="primary"):
+                        ok, msg = invest_basket(client["id"], b["id"], m_b)
+                        (st.success if ok else st.error)(msg)
+                        if ok:
+                            st.rerun()
+            st.divider()
+
+        st.markdown("**O elige una empresa individual:**")
         from src.screener.engine import load_screener
         scr = load_screener()
         scr_map = ({r["ticker"]: r for r in scr["rows"]}
@@ -570,6 +605,43 @@ def _client_panel(client: dict) -> None:
 
     # ------------------------------------------------------ Ideas & noticias --
     elif nav == _NAV[5]:
+        st.markdown("**⭐ Empresas que sigo**")
+        wl = watch_list(client["id"])
+        cw1, cw2 = st.columns([2, 1])
+        nuevo_w = cw1.selectbox("Agregar empresa a mi lista",
+                                [t for t in sorted(DEFAULT_UNIVERSE)
+                                 if t not in wl], key="watch_new")
+        if cw2.button("⭐ Seguir"):
+            watch_add(client["id"], nuevo_w)
+            st.rerun()
+        if wl:
+            from src.screener.engine import load_screener as _lsw
+            _sw = _lsw()
+            _mw = ({r["ticker"]: r for r in _sw["rows"]}
+                   if _sw and _sw.get("rows") else {})
+            wrows = []
+            for t in wl:
+                try:
+                    qw = get_quote(t)
+                    rw = _mw.get(t)
+                    wrows.append({"Ticker": t, "Precio": qw["price"],
+                                  "% Día": qw["change_pct"],
+                                  "Score": (rw or {}).get("score", "—"),
+                                  "Veredicto": _veredicto(rw)[0]})
+                except Exception:
+                    pass
+            if wrows:
+                st.dataframe(
+                    _paint(pd.DataFrame(wrows).style.format(
+                        {"Precio": "${:,.2f}", "% Día": "{:+.2f}%"}),
+                        ["% Día"]),
+                    hide_index=True, use_container_width=True)
+            quitar = st.selectbox("Dejar de seguir", ["—"] + wl, key="watch_rm")
+            if quitar != "—":
+                watch_remove(client["id"], quitar)
+                st.rerun()
+        st.divider()
+
         nota = get_note(client["id"])
         if nota:
             st.markdown(
@@ -761,6 +833,26 @@ def _admin_panel() -> None:
         st.success(f"Portafolio {metodo} asignado a {cli['name']}: " +
                    " · ".join(f"{t} {wi:.0%}" for t, wi in zip(tickers, w)))
         st.caption(f"El cliente ya puede entrar con su número ({cid_sel}) o nombre + PIN.")
+
+    with st.expander("🧺 Canastas modelo (los clientes las ven en Invertir)"):
+        cb1, cb2 = st.columns([1, 2])
+        b_name = cb1.text_input("Nombre", placeholder="🛡️ Escudo defensivo")
+        b_tesis = cb2.text_input("Tesis (el porqué, en simple)",
+                                 placeholder="Empresas que venden lo que la "
+                                 "gente compra en las buenas y en las malas.")
+        b_ticks = st.multiselect("Componentes (pesos iguales)",
+                                 DEFAULT_UNIVERSE, key="bk_ticks")
+        if st.button("Crear canasta") and b_name and len(b_ticks) >= 2:
+            w = 1.0 / len(b_ticks)
+            create_basket(b_name, b_tesis, b_ticks, [w] * len(b_ticks))
+            st.success(f"Canasta «{b_name}» publicada.")
+            st.rerun()
+        for b in list_baskets():
+            cbx1, cbx2 = st.columns([5, 1])
+            cbx1.caption(f"**{b['name']}** — {', '.join(b['tickers'])}")
+            if cbx2.button("🗑️", key=f"delbk_{b['id']}"):
+                delete_basket(b["id"])
+                st.rerun()
 
     with st.expander("💰 Depósito / retiro"):
         c1, c2, c3 = st.columns([1.4, 1, 2])

@@ -41,6 +41,12 @@ _SCHEMA = (
         PRIMARY KEY (client_id, ticker))""",
     """CREATE TABLE IF NOT EXISTS paper_cash (
         client_id TEXT PRIMARY KEY, cash REAL)""",
+    """CREATE TABLE IF NOT EXISTS baskets (
+        id TEXT PRIMARY KEY, name TEXT, tesis TEXT,
+        tickers TEXT, weights TEXT, created TEXT)""",
+    """CREATE TABLE IF NOT EXISTS client_watch (
+        client_id TEXT, ticker TEXT, added TEXT,
+        PRIMARY KEY (client_id, ticker))""",
 )
 
 # columnas agregadas después del primer despliegue (fallan si ya existen: ok)

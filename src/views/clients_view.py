@@ -1,10 +1,13 @@
 """Vista: 👥 Clientes — acceso por código/nombre + PIN, y administración.
 
-El panel del cliente (v0.14) es una experiencia completa por pestañas:
-Resumen (saldo, efectivo, inversiones, G/P), Portafolio, Movimientos,
-Ideas & noticias y Solicitudes. La comparte el Studio y el Portal.
+Panel del cliente v0.15 — experiencia fintech: hero de saldo con variación
+diaria, navegación tipo pills, evolución del portafolio con selector de
+rango, benchmark vs S&P 500, franja de índices, movimientos con filtros y
+solicitudes estructuradas. Paleta: marfil, carbón, oro, verde bosque.
 """
 from __future__ import annotations
+
+from datetime import datetime
 
 import pandas as pd
 import plotly.express as px
@@ -39,6 +42,51 @@ _PROFILE_SECTORS = {          # ideas del screener acordes al perfil
 }
 
 _VERDE, _ROJO = "#0E6B45", "#B42318"
+_BOSQUE, _ORO = "#1B4D3E", "#C6A75E"
+
+_PANEL_CSS = """
+<style>
+/* hero de saldo: verde bosque profundo con filo de oro */
+.alx-hero { background:linear-gradient(160deg,#1B4D3E 0%,#143C30 55%,#0F2E25 100%);
+  border:1px solid rgba(214,183,110,.65); border-radius:22px; padding:26px 30px;
+  color:#FAF7F0; box-shadow:0 14px 34px rgba(15,46,37,.22); }
+.alx-hero-label { text-transform:uppercase; letter-spacing:.1em; font-size:.72rem;
+  color:rgba(250,247,240,.75); }
+.alx-hero-value { font-family:'Playfair Display',serif; font-size:2.9rem;
+  font-weight:700; line-height:1.15; }
+.alx-chip { display:inline-block; padding:3px 12px; border-radius:999px;
+  font-size:.8rem; font-weight:600; background:rgba(250,247,240,.12);
+  border:1px solid rgba(250,247,240,.25); }
+.alx-chip.up { color:#7CE0B3; } .alx-chip.down { color:#F5A9A0; }
+.alx-hero-row { display:flex; gap:14px; margin-top:18px; flex-wrap:wrap; }
+.alx-mini { flex:1; min-width:132px; background:rgba(250,247,240,.08);
+  border:1px solid rgba(214,183,110,.35); border-radius:14px; padding:10px 14px; }
+.alx-mini span { display:block; font-size:.68rem; text-transform:uppercase;
+  letter-spacing:.07em; color:rgba(250,247,240,.7); }
+.alx-mini b { font-size:1.05rem; }
+.alx-mini b.up { color:#7CE0B3; } .alx-mini b.down { color:#F5A9A0; }
+
+/* navegación tipo pills (radio sin círculos) */
+div[role="radiogroup"] { gap:8px; }
+div[role="radiogroup"] label > div:first-child { display:none; }
+div[role="radiogroup"] label {
+  background:#FFFEFA; border:1px solid rgba(198,167,94,.5); border-radius:999px;
+  padding:7px 16px; transition:all .18s ease; cursor:pointer; }
+div[role="radiogroup"] label:hover { border-color:#C6A75E; }
+div[role="radiogroup"] label:has(input:checked) {
+  background:#1B4D3E; border-color:rgba(214,183,110,.9);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25), 0 4px 14px rgba(27,77,62,.25); }
+div[role="radiogroup"] label:has(input:checked) p { color:#FAF7F0 !important; }
+
+/* tarjeta-mensaje del asesor */
+.alx-note { background:#FFFEFA; border:1px solid rgba(198,167,94,.5);
+  border-left:3px solid #1B4D3E; border-radius:14px; padding:14px 18px; }
+.alx-note small { color:#78716C; }
+</style>
+"""
+
+_NAV = ["💼 Resumen", "📊 Mi portafolio", "🧾 Movimientos",
+        "💡 Ideas & noticias", "✉️ Solicitudes"]
 
 
 def _tint(v) -> str:
@@ -55,19 +103,41 @@ def _paint(styler, subset):
     return fn(_tint, subset=subset)
 
 
+def _series_portafolio(holdings: list[dict], capital: float,
+                       efectivo: float) -> pd.Series | None:
+    """Valor diario del portafolio (posiciones a precios de cierre + efectivo)."""
+    try:
+        partes = []
+        for h in holdings:
+            inv = h.get("invested") or capital * h["weight"]
+            units = inv / h["price_at"] if h["price_at"] else 0.0
+            partes.append(get_history(h["ticker"]).Close * units)
+        if not partes:
+            return None
+        serie = pd.concat(partes, axis=1).dropna().sum(axis=1) + efectivo
+        return serie if len(serie) > 2 else None
+    except Exception:
+        return None
+
+
 # ============================================================ PANEL CLIENTE =
 def _client_panel(client: dict) -> None:
+    st.markdown(_PANEL_CSS, unsafe_allow_html=True)
     render_ticker_tape()
-    st.title(f"Bienvenido, {client['name']}")
-    st.markdown(
-        f"<span class='jt-badge'>Cliente {client['id']}</span> "
-        f"<span class='jt-badge'>Perfil {client['perfil']}</span> "
-        f"<span class='jt-badge'>Desde {client['created']}</span>",
-        unsafe_allow_html=True,
-    )
-    if st.button("Cerrar sesión"):
-        st.session_state.pop("client_auth", None)
-        st.rerun()
+
+    c1, c2 = st.columns([5, 1])
+    with c1:
+        st.title(f"Bienvenido, {client['name']}")
+        st.markdown(
+            f"<span class='jt-badge'>Cliente {client['id']}</span> "
+            f"<span class='jt-badge'>Perfil {client['perfil']}</span> "
+            f"<span class='jt-badge'>{datetime.now():%d·%b·%Y}</span>",
+            unsafe_allow_html=True,
+        )
+    with c2:
+        if st.button("Cerrar sesión", use_container_width=True):
+            st.session_state.pop("client_auth", None)
+            st.rerun()
 
     capital = get_capital(client["id"]) or float(client.get("capital") or 0.0)
     holdings = get_portfolio(client["id"])
@@ -75,13 +145,14 @@ def _client_panel(client: dict) -> None:
     # -- valuación ------------------------------------------------------------
     rows, total_now, total_in = [], 0.0, 0.0
     for h in holdings:
-        px_now = get_quote(h["ticker"])["price"]
+        q = get_quote(h["ticker"])
         invested = h.get("invested") or capital * h["weight"]
         units = invested / h["price_at"] if h["price_at"] else 0.0
-        value = units * px_now
+        value = units * q["price"]
         rows.append({"Ticker": h["ticker"], "Peso": h["weight"],
-                     "P. entrada": h["price_at"], "P. actual": px_now,
+                     "P. entrada": h["price_at"], "P. actual": q["price"],
                      "Invertido": invested, "Valor hoy": value,
+                     "% Día": q.get("change_pct", 0.0),
                      "Rend. %": (value / invested - 1) * 100 if invested else 0.0})
         total_now += value
         total_in += invested
@@ -91,58 +162,131 @@ def _client_panel(client: dict) -> None:
     gp = total_now - total_in
     rend_total = (total_now / total_in - 1) * 100 if total_in else 0.0
 
-    tabs = st.tabs(["💼 Resumen", "📊 Mi portafolio", "🧾 Movimientos",
-                    "💡 Ideas & noticias", "✉️ Solicitudes"])
+    serie = _series_portafolio(holdings, capital, efectivo)
+    dia_pct = ((serie.iloc[-1] / serie.iloc[-2] - 1) * 100
+               if serie is not None and len(serie) > 1 else 0.0)
+
+    # -- navegación pills -------------------------------------------------------
+    if st.session_state.pop("alx_goto", None):
+        st.session_state["alx_nav"] = "✉️ Solicitudes"
+    nav = st.radio("Sección", _NAV, key="alx_nav", horizontal=True,
+                   label_visibility="collapsed")
 
     # ------------------------------------------------------------- Resumen --
-    with tabs[0]:
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Saldo total", fmt_money(saldo))
-        c2.metric("Efectivo disponible", fmt_money(efectivo))
-        c3.metric("Inversiones", fmt_money(total_now),
-                  fmt_pct(rend_total) if holdings else None)
-        c4.metric("Ganancia / pérdida", fmt_money(gp),
-                  fmt_pct(rend_total) if holdings else None)
+    if nav == _NAV[0]:
+        arrow = "▲" if dia_pct >= 0 else "▼"
+        cls = "up" if dia_pct >= 0 else "down"
+        gcls = "up" if gp >= 0 else "down"
+        st.markdown(
+            f"""<div class='alx-hero'>
+            <div class='alx-hero-label'>Saldo total</div>
+            <div class='alx-hero-value'>{fmt_money(saldo)}</div>
+            <span class='alx-chip {cls}'>{arrow} {dia_pct:+.2f}% hoy</span>
+            <div class='alx-hero-row'>
+              <div class='alx-mini'><span>Efectivo</span><b>{fmt_money(efectivo)}</b></div>
+              <div class='alx-mini'><span>Inversiones</span><b>{fmt_money(total_now)}</b></div>
+              <div class='alx-mini'><span>Ganancia / pérdida</span>
+                <b class='{gcls}'>{fmt_money(gp)} ({rend_total:+.1f}%)</b></div>
+            </div></div>""",
+            unsafe_allow_html=True,
+        )
+
+        b1, b2 = st.columns(2)
+        if b1.button("💵 Solicitar depósito / retiro", use_container_width=True):
+            st.session_state["alx_goto"] = True
+            st.rerun()
+        if b2.button("✉️ Hablar con tu asesor", use_container_width=True):
+            st.session_state["alx_goto"] = True
+            st.rerun()
+
+        if serie is not None:
+            st.markdown("**📈 Evolución de tu portafolio**")
+            rango = st.radio("Rango", ["30 días", "90 días", "1 año"], index=1,
+                             horizontal=True, label_visibility="collapsed")
+            n = {"30 días": 30, "90 días": 90, "1 año": 252}[rango]
+            s = serie.tail(n)
+            up = s.iloc[-1] >= s.iloc[0]
+            fig = px.area(s, labels={"value": "", "index": ""})
+            fig.update_traces(line_color=_VERDE if up else _ROJO,
+                              fillcolor=("rgba(14,107,69,.10)" if up
+                                         else "rgba(180,35,24,.10)"))
+            fig.update_layout(showlegend=False)
+            st.plotly_chart(dark_fig(fig, 280), use_container_width=True)
+
+        st.markdown("**🌐 El mercado hoy**")
+        icols = st.columns(4)
+        for col, t in zip(icols, ["SPY", "QQQ", "DIA", "GLD"]):
+            try:
+                q = get_quote(t)
+                col.metric(q["name"], f"${q['price']:,.2f}",
+                           f"{q['change_pct']:+.2f}%")
+            except Exception:
+                pass
 
         if not holdings:
-            st.info("Tu asesor aún no te asigna un portafolio. Puedes pedir uno "
-                    "personalizado en la pestaña **✉️ Solicitudes**. 🙂")
+            st.info("Tu asesor aún no te asigna un portafolio. Pide uno "
+                    "personalizado en **✉️ Solicitudes**. 🙂")
         else:
             a, b = st.columns([1, 1.2])
             with a:
-                st.markdown("**Composición de tu portafolio**")
+                st.markdown("**Composición**")
                 fig = px.pie(df, names="Ticker", values="Valor hoy", hole=0.55,
-                             color_discrete_sequence=["#1B4D3E", "#C6A75E",
-                                                      "#2F6B57", "#8C7845",
-                                                      "#4E8570", "#A99457"])
-                st.plotly_chart(dark_fig(fig, 320), use_container_width=True)
+                             color_discrete_sequence=[_BOSQUE, _ORO, "#2F6B57",
+                                                      "#8C7845", "#4E8570",
+                                                      "#A99457"])
+                st.plotly_chart(dark_fig(fig, 300), use_container_width=True)
             with b:
-                st.markdown("**Tus posiciones de un vistazo**")
-                mini = df[["Ticker", "Valor hoy", "Rend. %"]]
+                best = df.loc[df["% Día"].idxmax()]
+                st.markdown("**⭐ Tu posición del día**")
+                st.markdown(
+                    f"<div class='alx-note'><b>{best['Ticker']}</b> "
+                    f"<span style='{_tint(best['% Día'])}'>"
+                    f"{best['% Día']:+.2f}% hoy</span> · "
+                    f"{fmt_money(best['Valor hoy'])} en tu portafolio</div>",
+                    unsafe_allow_html=True)
+                st.markdown("**Tus posiciones**")
+                mini = df[["Ticker", "Valor hoy", "% Día", "Rend. %"]]
                 st.dataframe(
                     _paint(mini.style.format({"Valor hoy": "${:,.0f}",
+                                              "% Día": "{:+.2f}%",
                                               "Rend. %": "{:+.1f}%"}),
-                           ["Rend. %"]),
+                           ["% Día", "Rend. %"]),
                     hide_index=True, use_container_width=True)
-                nota = get_note(client["id"])
-                if nota:
-                    st.markdown(f"**📝 Nota de tu asesor** · *{nota['updated']}*")
-                    st.info(nota["nota"])
+            nota = get_note(client["id"])
+            if nota:
+                st.markdown(
+                    f"<div class='alx-note'>📝 <b>Nota de tu asesor</b> "
+                    f"<small>· {nota['updated']}</small><br>{nota['nota']}</div>",
+                    unsafe_allow_html=True)
 
     # ---------------------------------------------------------- Portafolio --
-    with tabs[1]:
+    elif nav == _NAV[1]:
         if not holdings:
             st.info("Sin portafolio asignado todavía.")
         else:
-            st.caption(f"Asignado el {holdings[0]['assigned']} · los precios de "
-                       "entrada quedaron congelados ese día: tu rendimiento es real.")
+            st.caption(f"Asignado el {holdings[0]['assigned']} · precios de "
+                       "entrada congelados ese día: tu rendimiento es real.")
             st.dataframe(
-                _paint(df.style.format(
+                _paint(df.drop(columns=["% Día"]).style.format(
                     {"Peso": "{:.0%}", "P. entrada": "${:.2f}",
                      "P. actual": "${:.2f}", "Invertido": "${:,.0f}",
                      "Valor hoy": "${:,.0f}", "Rend. %": "{:+.1f}%"}),
                     ["Rend. %"]),
                 hide_index=True, use_container_width=True)
+
+            if serie is not None:
+                try:
+                    spy = get_history("SPY").Close
+                    comp = pd.concat([serie, spy], axis=1).dropna().tail(252)
+                    comp.columns = ["Tu portafolio", "S&P 500 (SPY)"]
+                    comp = comp / comp.iloc[0] * 100
+                    st.markdown("**⚖️ Tu portafolio vs. S&P 500** (base 100, 1 año)")
+                    fig = px.line(comp, labels={"value": "", "index": ""},
+                                  color_discrete_map={"Tu portafolio": _BOSQUE,
+                                                      "S&P 500 (SPY)": _ORO})
+                    st.plotly_chart(dark_fig(fig, 300), use_container_width=True)
+                except Exception:
+                    pass
 
             tickers = [h["ticker"] for h in holdings]
             w_now = ((df["Valor hoy"] / total_now).tolist() if total_now
@@ -154,10 +298,15 @@ def _client_panel(client: dict) -> None:
                                             opt.returns_matrix(prices), RISK_FREE)
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Volatilidad anual",
-                          fmt_pct(stats["ann_vol"] * 100, signed=False))
-                c2.metric("Sharpe", fmt_num(stats["sharpe"]))
+                          fmt_pct(stats["ann_vol"] * 100, signed=False),
+                          help="Cuánto se mueve tu portafolio en un año típico. "
+                               "Menos = más estable.")
+                c2.metric("Sharpe", fmt_num(stats["sharpe"]),
+                          help="Rendimiento por unidad de riesgo. Más de 1 es bueno.")
                 c3.metric("Máx. drawdown histórico",
-                          fmt_pct(stats["max_drawdown"] * 100))
+                          fmt_pct(stats["max_drawdown"] * 100),
+                          help="La peor caída desde un máximo. Lo que habrías "
+                               "aguantado en el peor momento.")
                 mc = monte_carlo_paths(stats["ann_return"], stats["ann_vol"],
                                        years=5, n_paths=800, start=total_now)
                 st.caption(
@@ -192,7 +341,7 @@ def _client_panel(client: dict) -> None:
                                file_name=f"alx_{client['id']}_{_date.today()}.md")
 
     # ---------------------------------------------------------- Movimientos --
-    with tabs[2]:
+    elif nav == _NAV[2]:
         movs = get_movements(client["id"])
         if not movs:
             st.info("Aún no hay movimientos registrados.")
@@ -200,18 +349,28 @@ def _client_panel(client: dict) -> None:
             mdf = pd.DataFrame(movs).rename(columns={
                 "date": "Fecha", "tipo": "Tipo", "monto": "Monto",
                 "nota": "Detalle"})[["Fecha", "Tipo", "Monto", "Detalle"]]
+            f1, f2 = st.columns([2, 1])
+            tipos = f1.multiselect("Tipo", sorted(mdf["Tipo"].unique()),
+                                   placeholder="Todos los tipos")
+            desde = f2.date_input("Desde", value=None, format="YYYY-MM-DD")
+            if tipos:
+                mdf = mdf[mdf["Tipo"].isin(tipos)]
+            if desde:
+                mdf = mdf[mdf["Fecha"] >= str(desde)]
             st.dataframe(
                 _paint(mdf.style.format({"Monto": "${:,.2f}"}), ["Monto"]),
                 hide_index=True, use_container_width=True)
-            st.caption("Depósitos y compras registrados por tu asesor. "
-                       "Las compras muestran el monto destinado a cada activo.")
+            st.caption(f"Registro oficial de tu asesor — no editable · "
+                       f"Actualizado {datetime.now():%H:%M}")
 
     # ------------------------------------------------------ Ideas & noticias --
-    with tabs[3]:
+    elif nav == _NAV[3]:
         nota = get_note(client["id"])
         if nota:
-            st.markdown(f"**📝 Recomendación de tu asesor** · *{nota['updated']}*")
-            st.info(nota["nota"])
+            st.markdown(
+                f"<div class='alx-note'>📝 <b>Recomendación de tu asesor</b> "
+                f"<small>· {nota['updated']}</small><br>{nota['nota']}</div>",
+                unsafe_allow_html=True)
 
         from src.screener.engine import load_screener
         scr = load_screener()
@@ -246,29 +405,43 @@ def _client_panel(client: dict) -> None:
                 st.caption("Sin noticias recientes de tus posiciones.")
 
     # ----------------------------------------------------------- Solicitudes --
-    with tabs[4]:
-        st.markdown("**✉️ Pide un portafolio personalizado o haz una consulta**")
-        st.caption("Cuéntale a tu asesor qué buscas: más crecimiento, más "
-                   "estabilidad, dividendos, un sector que te interese, "
-                   "excluir alguna empresa…")
+    else:
+        st.markdown("**✉️ Pide un portafolio personalizado, un depósito/retiro "
+                    "o haz una consulta**")
         with st.form("solicitud"):
-            msg = st.text_area("Tu mensaje", max_chars=800, height=120,
-                               placeholder="Ej. Quiero un portafolio más "
-                               "conservador con dividendos, sin tabacaleras.")
+            c1, c2 = st.columns(2)
+            objetivo = c1.selectbox("Objetivo", [
+                "Portafolio personalizado", "Depósito", "Retiro",
+                "Más crecimiento", "Ingresos por dividendos",
+                "Preservar capital", "Consulta general"])
+            horizonte = c2.selectbox("Horizonte", [
+                "No aplica", "Menos de 1 año", "1-3 años", "3-5 años",
+                "5-10 años", "Más de 10 años"])
+            c1, c2 = st.columns(2)
+            riesgo = c1.select_slider("Nivel de riesgo deseado",
+                                      ["Muy bajo", "Bajo", "Medio", "Alto",
+                                       "Muy alto"], value="Medio")
+            monto = c2.number_input("Monto aproximado ($, opcional)",
+                                    0.0, 1e9, 0.0, step=5_000.0)
+            msg = st.text_area("Cuéntale más a tu asesor", max_chars=600,
+                               height=100, placeholder="Ej. Sin tabacaleras; "
+                               "me interesan dividendos y algo de tecnología.")
             if st.form_submit_button("Enviar solicitud", type="primary"):
-                if len(msg.strip()) >= 10:
-                    create_request(client["id"], msg)
-                    st.success("Solicitud enviada. Tu asesor la verá en su panel.")
-                else:
-                    st.error("Escribe al menos una línea para tu asesor.")
+                detalle = (f"[{objetivo}] Horizonte: {horizonte} · "
+                           f"Riesgo: {riesgo}"
+                           + (f" · Monto: ${monto:,.0f}" if monto else "")
+                           + (f". {msg.strip()}" if msg.strip() else ""))
+                create_request(client["id"], detalle)
+                st.success("✅ Enviada — tu asesor la verá en su bandeja del "
+                           "Studio y te responderá pronto.")
         prev = get_requests(client["id"])
         if prev:
             st.markdown("**Tus solicitudes**")
+            estados = {"pendiente": "🟡 en revisión", "atendida": "✅ respondida"}
             for r in prev[:8]:
-                icono = "🟡" if r["estado"] == "pendiente" else "✅"
-                st.markdown(f"{icono} *{r['date']}* — {r['mensaje']}  \n"
+                st.markdown(f"*{r['date']}* — {r['mensaje']}  \n"
                             f"<span style='color:#78716C;font-size:.85rem'>"
-                            f"Estado: {r['estado']}</span>",
+                            f"{estados.get(r['estado'], r['estado'])}</span>",
                             unsafe_allow_html=True)
         contacto = get_secret("ALX_CONTACTO")
         if contacto:

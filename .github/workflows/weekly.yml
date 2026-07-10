@@ -1,0 +1,29 @@
+name: Deep Scan semanal S&P 500
+
+on:
+  schedule:
+    - cron: "0 12 * * 6"        # sábado 12:00 UTC — mercado cerrado
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  deepscan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Deep Scan completo por bloques
+        run: python -c "from src.screener.deepscan import run_full; run_full()"
+      - name: Commit resultados
+        run: |
+          git config user.name "jubilatec-bot"
+          git config user.email "bot@al-x.local"
+          git add data/deepscan.json data/sp500.json || true
+          git diff --cached --quiet || git commit -m "chore: deep scan $(date -u +%F)"
+          git push

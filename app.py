@@ -21,7 +21,7 @@ st.set_page_config(
 from src import __version__
 from src.config import DISCLAIMER, get_settings
 from src.utils.styles import inject_css
-from src.views import (about, alerts_view, backtest_view, clients_view, copilot_view, dashboard, macro_view,
+from src.views import (advisor_view, about, alerts_view, backtest_view, clients_view, copilot_view, dashboard, macro_view,
                        markets_view, news_view, portfolio_view,
                        retirement_view, sources_view, stock, underdog_view)
 from src.views.components import render_ticker_tape
@@ -38,6 +38,7 @@ render_ticker_tape()
 PAGES = [
     "🌐 Dashboard",
     "🤖 Copiloto",
+    "🧠 Mesa del Asesor",
     "🔍 Análisis de Acción",
     "🗺️ Mercados",
     "🐤 Underdog",
@@ -107,6 +108,7 @@ page = st.session_state["page"]
 _routes = {
     "🌐 Dashboard": dashboard.render,
     "🤖 Copiloto": copilot_view.render,
+    "🧠 Mesa del Asesor": advisor_view.render,
     "🗺️ Mercados": markets_view.render,
     "🐤 Underdog": underdog_view.render,
     "💼 Portafolio": portfolio_view.render,

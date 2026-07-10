@@ -725,3 +725,94 @@ def test_v021_capa_para_todos():
     assert "30%" in d and "promesa" in d and "9%" in d
     d2 = plain.explica_reverse_dcf("KO", 0.05)
     assert "sorpresa es a tu favor" in d2
+
+
+def test_v022_mesa_del_asesor():
+    """Ficha del asesor: lente factorial, estrategia Piotroski y aptitudes."""
+    from src.advisor import profile as ap
+
+    rows = [
+        {"ticker": "AAA", "valoracion": 90, "calidad": 80, "mom_6m": 12,
+         "tecnico": 70, "name": "A", "sector": "Salud", "price": 10, "score": 75},
+        {"ticker": "BBB", "valoracion": 50, "calidad": 60, "mom_6m": 3,
+         "tecnico": 50, "name": "B", "sector": "Tecnología", "price": 20, "score": 55},
+        {"ticker": "CCC", "valoracion": 20, "calidad": 30, "mom_6m": -8,
+         "tecnico": 30, "name": "C", "sector": "Energía", "price": 30, "score": 30},
+    ]
+    lens = ap.factor_lens("AAA", rows)
+    assert lens["Valor"] == 100 and lens["Momentum"] == 100
+    assert ap.factor_lens("CCC", rows)["Valor"] < 50
+    assert ap.factor_lens("ZZZ", rows) is None
+
+    # estrategia Piotroski: tercil barato + F alto primero, evitar F<=1
+    fake_f = {"AAA": {"score": 9}, "BBB": {"score": 5}, "CCC": {"score": 1}}
+    res = ap.piotroski_value_screen(rows, lambda t: t,
+                                    lambda t: fake_f[t], max_n=5)
+    assert res and res[0]["ticker"] == "AAA" and res[0]["apta"]
+
+    # aptitud por perfil con razones
+    aptos = ap.suitability(75, "Salud", 70, 2, -10)
+    assert aptos["conservador"][0] and aptos["moderado"][0]
+    aptos = ap.suitability(50, "Tecnología", 60, 8, -25)
+    assert not aptos["conservador"][0] and aptos["agresivo"][0]
+    assert "brinco" in ap.suitability(80, "Tecnología", 80, 0, 0)["conservador"][1]
+
+    # ficha completa offline (datos sintéticos deterministas)
+    p = ap.advisor_profile("AAPL")
+    assert p["comp"]["total"] >= 0 and p["puntos"] and p["riesgos"]
+    assert set(p["aptos"]) == {"conservador", "moderado", "agresivo"}
+
+def test_v023_deepscan():
+    """Deep Scan: validación en historial propio, etiquetas y bloques resumibles."""
+    import os
+    os.environ["JT_DEEPSCAN_PATH"] = "/tmp/jt_deepscan.json"
+    for f in ("/tmp/jt_deepscan.json",):
+        if os.path.exists(f):
+            os.remove(f)
+    from src.screener import deepscan as dsc
+
+    # etiquetas: la lógica del veredicto
+    assert dsc.deep_label(80, 9, 70)["label"] == "Comprar"
+    assert dsc.deep_label(80, 9, None)["label"] == "Acumular"
+    assert dsc.deep_label(55, 5, 70)["label"] == "Esperar"
+    assert dsc.deep_label(30, 5, 50)["label"] == "Evitar"
+    assert dsc.deep_label(90, 1, 90)["label"] == "Evitar"    # F≤1 manda
+    assert "Piotroski" in dsc.deep_label(90, 0, 90)["razon"]
+
+    # validación walk-forward sobre serie sintética determinista
+    from src.data.market_data import get_history
+    val = dsc.own_history_validation(get_history("AAPL", period="5y").Close)
+    assert val["n"] >= 6 and 0 <= val["win_rate"] <= 100
+
+    # bloques resumibles con analizador de mentira (sin red)
+    def fake(t):
+        return {"ticker": t, "name": t, "sector": "X", "price": 1.0,
+                "score": 75, "f_score": 8, "n": 10, "win_rate": 65,
+                "avg_fwd_3m": 4.2, **dsc.deep_label(75, 8, 65)}
+    st1 = dsc.start_or_resume(["A", "B", "C", "D", "E"])
+    assert st1["universe_n"] == 5 and len(st1["pending"]) == 5
+    st2 = dsc.run_block(2, analyze_fn=fake)
+    assert len(st2["done"]) == 2 and len(st2["pending"]) == 3
+    st3 = dsc.run_block(2, analyze_fn=fake)          # retoma donde iba
+    assert len(st3["done"]) == 4 and len(st3["pending"]) == 1
+    st4 = dsc.run_full(block=2, analyze_fn=fake, log=lambda *_: None)
+    assert len(st4["done"]) == 5 and not st4["pending"]
+    assert st4["done"]["A"]["label"] == "Comprar"
+    os.environ.pop("JT_DEEPSCAN_PATH", None)
+
+
+def test_v023b_ivv_parser():
+    """El CSV oficial de IVV se parsea bien (y aguanta el preámbulo raro)."""
+    from src.screener.deepscan import _parse_ivv_csv
+    csv_falso = "\n".join([
+        "iShares Core S&P 500 ETF", "Fund Holdings as of,Jul 09 2026", "",
+        "Ticker,Name,Sector,Asset Class,Market Value,Weight (%)",
+        "AAPL,APPLE INC,Information Technology,Equity,\"51,000,000\",7.1",
+        "MSFT,MICROSOFT CORP,Information Technology,Equity,\"48,000,000\",6.8",
+        "BRK.B,BERKSHIRE HATHAWAY,Financials,Equity,\"20,000,000\",1.7",
+        "USD,US DOLLAR,Cash,Cash and/or Derivatives,\"9,000,000\",0.1",
+        "-,FUTURES,Index,Cash and/or Derivatives,\"1,000,000\",0.0",
+    ])
+    tks = _parse_ivv_csv(csv_falso)
+    assert tks == ["AAPL", "BRK-B", "MSFT"]     # equity sí; cash/futuros no
+    assert _parse_ivv_csv("basura sin encabezado") == []

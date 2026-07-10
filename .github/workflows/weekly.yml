@@ -19,11 +19,25 @@ jobs:
           python-version: "3.11"
       - run: pip install -r requirements.txt
       - name: Deep Scan completo por bloques
-        run: python -c "from src.screener.deepscan import run_full; run_full()"
+        run: |
+          python - << 'PY'
+          from src.screener.deepscan import run_full, sp500_universe
+          uni = sp500_universe()
+          print(f"universo: {len(uni)} tickers")
+          st = run_full(uni)
+          print(f"analizadas: {len(st['done'])}/{st['universe_n']}")
+          etiquetas = {}
+          for r in st["done"].values():
+              etiquetas[r["label"]] = etiquetas.get(r["label"], 0) + 1
+          print("etiquetas:", etiquetas)
+          assert len(st["done"]) >= 30, (
+              "Deep Scan casi vacío: fuentes de datos caídas o bloqueadas — "
+              "el job debe fallar, no fingir éxito")
+          PY
       - name: Commit resultados
         run: |
           git config user.name "jubilatec-bot"
           git config user.email "bot@al-x.local"
-          git add data/deepscan.json data/sp500.json || true
+          git add -A data/
           git diff --cached --quiet || git commit -m "chore: deep scan $(date -u +%F)"
           git push

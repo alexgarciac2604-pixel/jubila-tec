@@ -56,19 +56,19 @@ button[kind="primary"], div[data-testid="stFormSubmitButton"] > button {
   position:relative; overflow:hidden;
   background:
     linear-gradient(180deg, rgba(255,255,255,.32) 0%, rgba(255,255,255,.07) 46%,
-                    rgba(0,0,0,.12) 100%), #1B4D3E !important;
+                    rgba(0,0,0,.12) 100%), #14235C !important;
   color:#FFFFFF !important;
   border:1px solid rgba(214,183,110,.9) !important;
   border-radius:14px !important;
   backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.38),
              inset 0 -1px 0 rgba(0,0,0,.18),
-             0 6px 20px rgba(27,77,62,.20);
+             0 6px 20px rgba(20,35,92,.22);
   transition:all .22s ease;
 }
 button[kind="primary"]:hover, div[data-testid="stFormSubmitButton"] > button:hover {
   transform:translateY(-1px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 10px 26px rgba(27,77,62,.30);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 10px 26px rgba(20,35,92,.32);
   border-color:#D6B76E !important;
 }
 /* reflejo superior del cristal */
@@ -89,7 +89,7 @@ button[kind="secondary"] {
 
 /* pestañas: acento verde bosque con subrayado dorado */
 button[data-baseweb="tab"] { font-weight:600; color:#78716C; }
-button[data-baseweb="tab"][aria-selected="true"] { color:#1B4D3E; }
+button[data-baseweb="tab"][aria-selected="true"] { color:#14235C; }
 div[data-baseweb="tab-highlight"] { background-color:#C6A75E !important; }
 
 /* contenedores, expanders, inputs */
@@ -147,14 +147,12 @@ if "client_auth" in st.session_state:
 # --- pantalla de acceso -------------------------------------------------------
 _, centro, _ = st.columns([1, 1.3, 1])
 with centro:
+    from src.utils.branding import logo_html
     st.markdown(
-        "<div style='text-align:center;margin-top:7vh'>"
-        "<div style='font-family:Playfair Display,serif;font-weight:700;"
-        "font-size:3.2rem;letter-spacing:-0.02em;color:#1C1917'>AL·X</div>"
-        "<div style='width:64px;height:1px;background:#C6A75E;margin:14px auto'></div>"
-        "<div style='color:#78716C;margin-bottom:2rem;letter-spacing:.06em;"
-        "text-transform:uppercase;font-size:.8rem'>Portal privado de clientes</div>"
-        "</div>",
+        "<div style='margin-top:6vh'>" + logo_html(210) +
+        "<div style='text-align:center;color:#78716C;margin:10px 0 2rem;"
+        "letter-spacing:.06em;text-transform:uppercase;font-size:.8rem'>"
+        "Portal privado de clientes</div></div>",
         unsafe_allow_html=True,
     )
 

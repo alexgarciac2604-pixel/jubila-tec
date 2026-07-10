@@ -52,14 +52,14 @@ _PROFILE_SECTORS = {          # ideas del screener acordes al perfil
 }
 
 _VERDE, _ROJO = "#0E6B45", "#B42318"
-_BOSQUE, _ORO = "#1B4D3E", "#C6A75E"
+_BOSQUE, _ORO = "#14235C", "#C6A75E"   # _BOSQUE ahora es azul medianoche
 
 _PANEL_CSS = """
 <style>
 /* hero de saldo: verde bosque profundo con filo de oro */
-.alx-hero { background:linear-gradient(160deg,#1B4D3E 0%,#143C30 55%,#0F2E25 100%);
+.alx-hero { background:linear-gradient(160deg,#1E2F72 0%,#14235C 55%,#0B1330 100%);
   border:1px solid rgba(214,183,110,.65); border-radius:22px; padding:26px 30px;
-  color:#FAF7F0; box-shadow:0 14px 34px rgba(15,46,37,.22); }
+  color:#FAF7F0; box-shadow:0 14px 34px rgba(11,19,48,.25); }
 .alx-hero-label { text-transform:uppercase; letter-spacing:.1em; font-size:.72rem;
   color:rgba(250,247,240,.75); }
 .alx-hero-value { font-family:'Playfair Display',serif; font-size:2.9rem;
@@ -84,13 +84,13 @@ div[role="radiogroup"] label {
   padding:7px 16px; transition:all .18s ease; cursor:pointer; }
 div[role="radiogroup"] label:hover { border-color:#C6A75E; }
 div[role="radiogroup"] label:has(input:checked) {
-  background:#1B4D3E; border-color:rgba(214,183,110,.9);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.25), 0 4px 14px rgba(27,77,62,.25); }
+  background:#14235C; border-color:rgba(214,183,110,.9);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25), 0 4px 14px rgba(20,35,92,.28); }
 div[role="radiogroup"] label:has(input:checked) p { color:#FAF7F0 !important; }
 
 /* tarjeta-mensaje del asesor */
 .alx-note { background:#FFFEFA; border:1px solid rgba(198,167,94,.5);
-  border-left:3px solid #1B4D3E; border-radius:14px; padding:14px 18px; }
+  border-left:3px solid #14235C; border-radius:14px; padding:14px 18px; }
 .alx-note small { color:#78716C; }
 </style>
 """
@@ -201,6 +201,9 @@ def _client_panel(client: dict) -> None:
 
     c1, c2 = st.columns([5, 1])
     with c1:
+        from src.utils.branding import logo_html
+        st.markdown(logo_html(96, centrado=False, con_texto=False),
+                    unsafe_allow_html=True)
         st.title(f"Bienvenido, {client['name']}")
         st.markdown(
             f"<span class='jt-badge'>Cliente {client['id']}</span> "
@@ -356,8 +359,8 @@ def _client_panel(client: dict) -> None:
             with a:
                 st.markdown("**Composición**")
                 fig = px.pie(df, names="Ticker", values="Valor hoy", hole=0.55,
-                             color_discrete_sequence=[_BOSQUE, _ORO, "#2F6B57",
-                                                      "#8C7845", "#4E8570",
+                             color_discrete_sequence=["#14235C", _ORO, "#4A5FA8",
+                                                      "#8C7845", "#1E2F72",
                                                       "#A99457"])
                 st.plotly_chart(dark_fig(fig, 300), use_container_width=True)
             with b:

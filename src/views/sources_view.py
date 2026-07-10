@@ -5,7 +5,7 @@ import streamlit as st
 
 from src.config import get_settings
 from src.data.dbx import backend, ping
-from src.data.market_data import using_sample
+from src.data.market_data import using_sample, yf_status
 
 
 def render() -> None:
@@ -13,8 +13,12 @@ def render() -> None:
     s = get_settings()
 
     rows = [
-        ("Mercado (precios/fundamentales)", "yfinance",
-         "🧪 sintético" if using_sample() else "🟢 activo", "Sin clave; automático con internet."),
+        ("Mercado (precios/fundamentales)", "yfinance + Stooq",
+         ("🧪 sintético (JT_FORCE_SAMPLE)" if using_sample()
+          else ("🟢 activo" if yf_status()[0]
+                else "🟡 yfinance roto — Stooq al rescate")),
+         ("Sin clave; automático con internet."
+          if yf_status()[0] else f"Error de yfinance: {yf_status()[1][:80]}")),
         ("Noticias", "NewsAPI / yfinance",
          "🟢 activo" if s.has_news() else "🟡 fallback", "Agrega NEWSAPI_KEY en `.env`."),
         ("Macro", "FRED",

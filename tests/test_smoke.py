@@ -6,6 +6,8 @@ import sys
 
 os.environ["JT_FORCE_SAMPLE"] = "1"
 os.environ.setdefault("JT_DB_PATH", "/tmp/jt_test.db")
+os.environ.setdefault("JT_FORCE_SAMPLE", "1")   # tests: offline explícito
+os.environ.setdefault("JT_ALLOW_SAMPLE_SAVE", "1")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -816,3 +818,32 @@ def test_v023b_ivv_parser():
     tks = _parse_ivv_csv(csv_falso)
     assert tks == ["AAPL", "BRK-B", "MSFT"]     # equity sí; cash/futuros no
     assert _parse_ivv_csv("basura sin encabezado") == []
+
+
+def test_v0231_candados_integridad():
+    """using_sample ya no se auto-otorga; save_screener rechaza lo sintético."""
+    import os
+    from src.data.market_data import using_sample, yf_status
+    assert using_sample() is True              # tests: JT_FORCE_SAMPLE=1 explícito
+    ok, err = yf_status()
+    assert ok is False and err                 # sandbox sin yfinance, motivo visible
+
+    from src.screener.engine import save_screener
+    os.environ["JT_SCREENER_PATH"] = "/tmp/jt_scr_guard.json"
+    malo = {"date": "2026-01-01", "source": "sample", "n": 105, "rows": []}
+    os.environ.pop("JT_ALLOW_SAMPLE_SAVE", None)
+    try:
+        try:
+            save_screener(malo)
+            assert False, "debió rechazar el screener sintético"
+        except RuntimeError as e:
+            assert "integridad" in str(e)
+        casi_vacio = {"date": "2026-01-01", "source": "stooq", "n": 3, "rows": []}
+        try:
+            save_screener(casi_vacio)
+            assert False, "debió rechazar el screener casi vacío"
+        except RuntimeError as e:
+            assert "anterior" in str(e)
+    finally:
+        os.environ["JT_ALLOW_SAMPLE_SAVE"] = "1"
+        os.environ.pop("JT_SCREENER_PATH", None)

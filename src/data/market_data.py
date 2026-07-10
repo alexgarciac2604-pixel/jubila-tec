@@ -14,15 +14,26 @@ from src.utils.cache import ttl_cache
 
 try:
     import yfinance as yf
-    _HAS_YF = True
-except Exception:
-    _HAS_YF = False
+    _HAS_YF, _YF_ERR = True, ""
+except Exception as _e:                     # nunca tragar el motivo en silencio
+    _HAS_YF, _YF_ERR = False, f"{type(_e).__name__}: {_e}"
 
 _SOURCES: dict[str, str] = {}  # ticker → proveedor que realmente respondió
 
 
 def using_sample() -> bool:
-    return get_settings().force_sample or not _HAS_YF
+    """True SOLO si el usuario pidió modo sintético (JT_FORCE_SAMPLE=1).
+
+    v0.23.1: que falte yfinance ya NO autoriza datos sintéticos — Stooq
+    sigue entregando datos reales. Sin este cambio, un import roto en el
+    runner publicaba screeners sintéticos con la conciencia tranquila.
+    """
+    return get_settings().force_sample
+
+
+def yf_status() -> tuple[bool, str]:
+    """¿yfinance importó? (ok, error) — para logs y la página de Fuentes."""
+    return _HAS_YF, _YF_ERR
 
 
 def source_of(ticker: str) -> str:
@@ -80,7 +91,7 @@ def get_fundamentals(ticker: str) -> dict:
         overlay = edgar.fundamentals_overlay(ticker)
         if overlay:
             base.update(overlay)
-    if not using_sample():
+    if not using_sample() and _HAS_YF:
         try:
             info = yf.Ticker(ticker).info or {}
             for src_key, dst_key in _YF_MAP.items():
@@ -119,7 +130,7 @@ def get_quotes(tickers: list[str]) -> pd.DataFrame:
 @ttl_cache(ttl=3600)
 def get_fx_history(pair: str = "MXN=X") -> pd.DataFrame:
     """Tipo de cambio (p. ej. USD/MXN). Failover a serie sintética."""
-    if not using_sample():
+    if not using_sample() and _HAS_YF:
         try:
             df = yf.Ticker(pair).history(period="2y")
             if df is not None and len(df) > 30:
@@ -135,7 +146,7 @@ def lookup_ticker(symbol: str) -> bool:
     Evita afirmaciones desactualizadas (caso SpaceX): antes de decir que algo
     no existe, se le pregunta al mercado. False si no hay red o no cotiza.
     """
-    if using_sample():
+    if using_sample() or not _HAS_YF:
         return False
     try:
         h = yf.Ticker(symbol.upper()).history(period="5d")

@@ -59,9 +59,15 @@ def run(verbose: bool = True) -> dict:
         if telegram_configured() else False
     )
     try:                                # screener nocturno del universo amplio
+        from src.data.market_data import yf_status
+        ok_yf, err_yf = yf_status()
+        if verbose and not ok_yf:
+            print(f"⚠️ yfinance NO importó: {err_yf} — siguiendo con Stooq")
         from src.screener.engine import save_screener, run_screener
         scr = run_screener()
-        save_screener(scr)
+        if verbose:
+            print(f"screener: {scr['n']} filas · fuente {scr['source']}")
+        save_screener(scr)          # lanza si es sintético o casi vacío
         result["screener_n"] = scr["n"]
     except Exception as e:              # noqa: BLE001
         result["errors"].append(f"screener: {e}")

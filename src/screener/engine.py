@@ -80,13 +80,30 @@ def run_screener(universe: list[str] | None = None) -> dict:
         except Exception:
             continue
     rows.sort(key=lambda r: r["score"], reverse=True)
-    return {"date": str(date.today()),
-            "source": "sample" if using_sample() else "yfinance",
+    if using_sample():
+        fuente = "sample"
+    else:
+        from src.data.market_data import source_of
+        usados = {source_of(r["ticker"]) for r in rows} or {"?"}
+        fuente = "+".join(sorted(usados))
+    return {"date": str(date.today()), "source": fuente,
             "n": len(rows), "rows": rows}
 
 
 def save_screener(data: dict | None = None) -> str:
+    """Persiste el screener con dos candados de integridad:
+    - jamás datos sintéticos (salvo JT_ALLOW_SAMPLE_SAVE=1, p. ej. tests)
+    - jamás pisar un archivo bueno con uno casi vacío (fuente caída)."""
     data = data or run_screener()
+    permitir_sample = os.getenv("JT_ALLOW_SAMPLE_SAVE") == "1"
+    if "sample" in (data.get("source") or "") and not permitir_sample:
+        raise RuntimeError(
+            "Candado de integridad: el screener salió SINTÉTICO "
+            "(¿yfinance roto y Stooq caído?). No se publica.")
+    if data.get("n", 0) < 30 and not permitir_sample:
+        raise RuntimeError(
+            f"Candado de integridad: solo {data.get('n')} filas — "
+            "fuentes caídas. Se conserva el archivo anterior.")
     path = _path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:

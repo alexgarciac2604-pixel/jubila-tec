@@ -670,3 +670,30 @@ def test_v019_metas_insignias_alertas():
     assert cm.check_alerts("C-019") == []                  # no re-dispara
 
     cm.delete_client("C-019")
+
+
+def test_v020_narrativa_y_cristal():
+    """Sprint C: historia mensual coherente y reverse DCF interpretable."""
+    from src.report.briefing import monthly_story
+    h = monthly_story("Ana", 120_000, 3_400, 2.9, 1.1,
+                      {"JNJ": 4.2, "KO": -1.3}, 5_000, 2, 0,
+                      {"nombre": "Mi retiro", "monto_meta": 1_000_000},
+                      hubo_caida=True)
+    assert "Ana" in h and "creció 2.9%" in h and "$120,000" in h
+    assert "Le ganaste al S&P 500" in h            # 2.9 > 1.1
+    assert "JNJ" in h and "KO" in h and "no vendiste" in h
+    assert "Mi retiro" in h and "12%" in h          # 120k/1M
+    h2 = monthly_story("Leo", 90_000, -2_000, -2.2, 0.5, {}, 0, 0, 1,
+                       None, hubo_caida=True)
+    assert "retrocedió 2.2%" in h2 and "te ganó" in h2 and "miedo" in h2
+
+    # reverse DCF: recupera el crecimiento que lo generó (ida y vuelta)
+    from src.valuation.dcf import dcf_value, reverse_dcf
+    ev = dcf_value(1_000.0, 0.12, 0.09)["equity_value"]
+    g = reverse_dcf(ev, 1_000.0, 0.09)
+    assert g is not None and abs(g - 0.12) < 0.005
+
+    # cristalización de pérdida (matemática del anti-pánico)
+    price_at, px_now, monto = 100.0, 80.0, 4_000.0
+    cristaliza = monto - (monto / px_now) * price_at   # vendo $4k a -20%
+    assert abs(cristaliza - (-1_000.0)) < 0.01          # pierdo $1,000 real

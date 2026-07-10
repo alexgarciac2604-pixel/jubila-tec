@@ -476,6 +476,50 @@ def _client_panel(client: dict) -> None:
             st.download_button("📄 Descargar mi estado de cuenta", reporte,
                                file_name=f"alx_{client['id']}_{_date.today()}.md")
 
+            with st.expander("📖 Tu mes contado en palabras"):
+                try:
+                    from src.report.briefing import monthly_story
+                    s21 = serie.tail(22) if serie is not None else None
+                    pct_mes = ((s21.iloc[-1] / s21.iloc[0] - 1) * 100
+                               if s21 is not None and len(s21) > 2 else 0.0)
+                    delta_mes = (s21.iloc[-1] - s21.iloc[0]
+                                 if s21 is not None and len(s21) > 2 else 0.0)
+                    try:
+                        _spy = get_history("SPY").Close.tail(22)
+                        spy_pct = (_spy.iloc[-1] / _spy.iloc[0] - 1) * 100
+                    except Exception:
+                        spy_pct = None
+                    cambios = {}
+                    for h in holdings:
+                        try:
+                            c = get_history(h["ticker"]).Close.tail(22)
+                            cambios[h["ticker"]] = (c.iloc[-1] / c.iloc[0] - 1) * 100
+                        except Exception:
+                            pass
+                    from datetime import date as _dd, timedelta as _td
+                    corte = str(_dd.today() - _td(days=30))
+                    movs_mes = [m for m in get_movements(client["id"])
+                                if m["date"] >= corte]
+                    deps = sum(m["monto"] for m in movs_mes
+                               if m["tipo"].startswith("Depósito"))
+                    ncom = len([m for m in movs_mes if m["tipo"] == "Compra"])
+                    nven = len([m for m in movs_mes if m["tipo"] == "Venta"])
+                    caida = (s21 is not None and len(s21) > 2 and
+                             (s21 / s21.cummax() - 1).min() < -0.05)
+                    historia = monthly_story(
+                        client["name"].split()[0], saldo, delta_mes, pct_mes,
+                        spy_pct, cambios, deps, ncom, nven,
+                        get_goal(client["id"]), bool(caida))
+                    st.markdown(historia)
+                    from datetime import date as _d3
+                    st.download_button("⬇️ Guardar mi historia del mes",
+                                       historia,
+                                       file_name=f"alx_mes_{client['id']}_"
+                                                 f"{_d3.today()}.md")
+                except Exception:
+                    st.caption("La historia del mes estará lista cuando haya "
+                               "suficientes datos.")
+
     # ------------------------------------------------------------- Invertir --
     elif nav == _NAV[2]:
         st.markdown("**🛒 Invertir**")
@@ -547,12 +591,95 @@ def _client_panel(client: dict) -> None:
             f"<b>{titular}</b>: {razon}{pilares}{mercado}</div>",
             unsafe_allow_html=True)
 
+        with st.expander("🔮 Caja de Cristal — revisa nuestra matemática"):
+            if row:
+                st.markdown(
+                    f"**Score de screening** = Calidad×35% + Técnico×35% + "
+                    f"Valoración×30% = {row.get('calidad', 0)}×.35 + "
+                    f"{row.get('tecnico', 0)}×.35 + {row.get('valoracion', 0)}"
+                    f"×.30 ≈ **{row.get('score', '—')}/100**")
+                st.caption("Calidad: ROE, márgenes, deuda y caja · Técnico: "
+                           "tendencia, RSI, momentum · Valoración: earnings "
+                           "yield vs. su sector. Sin cajas negras.")
+            try:
+                from src.data.market_data import get_fundamentals, source_of
+                fnd = get_fundamentals(tk)
+                mc = fnd.get("market_cap") or 0
+                fcf = fnd.get("fcf") or 0
+                nd = (fnd.get("total_debt") or 0) - (fnd.get("cash") or 0)
+                if mc > 0 and fcf > 0:
+                    from src.valuation.dcf import reverse_dcf
+                    g = reverse_dcf(mc, fcf, 0.09, net_debt=nd)
+                    if g is not None:
+                        if g > 0.25:
+                            juicio = ("una promesa **muy exigente** — pocas "
+                                      "empresas en la historia lo han sostenido")
+                        elif g > 0.10:
+                            juicio = ("optimista pero posible para un buen "
+                                      "negocio")
+                        else:
+                            juicio = ("una vara baja: si lo supera, la "
+                                      "sorpresa es a tu favor")
+                        st.markdown(
+                            f"**🎯 Qué promete el precio:** para justificar su "
+                            f"valor actual, {tk} necesita crecer su flujo de "
+                            f"caja **~{g:.0%} anual durante 5 años** "
+                            f"(WACC 9%). Eso es {juicio}. ¿Tú lo crees?")
+                st.caption(f"Fuente de precios: {source_of(tk)} · "
+                           "Fundamentales: SEC EDGAR/yfinance · Modelos "
+                           "documentados en 📚 Modelos del Studio.")
+            except Exception:
+                st.caption("Reverse DCF no disponible para esta empresa "
+                           "en este momento.")
+
         monto = st.number_input("Monto ($)", 100.0, 1e8, 5_000.0, step=500.0,
                                 key="inv_monto")
         adelante = True
         if row and row.get("score", 50) < 45 and side == "compra":
             adelante = st.checkbox("Entiendo que el análisis de hoy sugiere "
                                    "cautela y quiero comprar de todos modos.")
+        if side == "venta":
+            hpos = next((h for h in holdings if h["ticker"] == tk), None)
+            if hpos:
+                try:
+                    _pxv = get_quote(tk)["price"]
+                    _inv = hpos.get("invested") or capital * hpos["weight"]
+                    _units = _inv / hpos["price_at"] if hpos["price_at"] else 0
+                    _val = _units * _pxv
+                    _rend = (_val / _inv - 1) * 100 if _inv else 0
+                    if _rend < -2:
+                        _m = min(monto if "inv_monto" in st.session_state
+                                 else 5_000.0, _val)
+                        _cristaliza = _m - (_m / _pxv) * hpos["price_at"]
+                        turb = ""
+                        try:
+                            from src.models.regime import market_regime
+                            _reg = market_regime()
+                            if _reg.get("p_turbulent", 0) > 0.5:
+                                turb = (" Además el mercado está en plena "
+                                        "turbulencia: vender en pánico durante "
+                                        "la tormenta es, históricamente, la "
+                                        "forma #1 de perder dinero.")
+                        except Exception:
+                            pass
+                        st.markdown(
+                            f"<div class='alx-note' style='border-left-color:"
+                            f"#B42318'>🧘 <b>Un momento — respira.</b><br>"
+                            f"{tk} va {_rend:+.1f}% desde tu compra. Vender "
+                            f"ahora <b>convierte en definitiva una pérdida de "
+                            f"~${abs(_cristaliza):,.0f}</b> que hoy solo está "
+                            f"en papel.{turb} Los mercados se han recuperado "
+                            f"de cada crisis de su historia — la pregunta no "
+                            f"es si duele hoy, sino si la empresa sigue "
+                            f"siendo buena.</div>",
+                            unsafe_allow_html=True)
+                        adelante = st.checkbox(
+                            "Lo pensé con calma (no es pánico) y decido vender.")
+                        if st.button("✉️ Mejor lo hablo con mi asesor"):
+                            st.session_state["alx_goto"] = True
+                            st.rerun()
+                except Exception:
+                    pass
         if st.button(f"⚡ Ejecutar {side} ahora", type="primary",
                      disabled=not adelante):
             nota = (f"Score AL-X {row.get('score', '—')}/100 · {titular}"

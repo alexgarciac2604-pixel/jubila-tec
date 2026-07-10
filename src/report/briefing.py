@@ -82,3 +82,49 @@ def client_briefing(rows: list[dict], dia_pct: float,
     if abs(dia_pct) < 0.8:
         partes.append("Día normal: no hay nada que hacer — la paciencia paga. 🧘")
     return " ".join(partes)
+
+
+def monthly_story(nombre: str, saldo: float, delta_mes: float, pct_mes: float,
+                  spy_pct: float | None, cambios_30d: dict,
+                  depositos: float, n_compras: int, n_ventas: int,
+                  meta: dict | None = None, hubo_caida: bool = False) -> str:
+    """📖 El mes del cliente contado en palabras — nadie más lo hace."""
+    L = [f"## 📖 Tu mes en AL-X, {nombre}", ""]
+    signo = "creció" if delta_mes >= 0 else "retrocedió"
+    L.append(f"Tu patrimonio **{signo} {abs(pct_mes):.1f}%** este mes "
+             f"({'+' if delta_mes >= 0 else '−'}${abs(delta_mes):,.0f}) y hoy "
+             f"vale **${saldo:,.0f}**.")
+    if spy_pct is not None:
+        if pct_mes >= spy_pct:
+            L.append(f"Le ganaste al S&P 500, que se movió {spy_pct:+.1f}%. "
+                     "No te acostumbres — casi nadie lo logra siempre — "
+                     "pero disfrútalo. 🏆")
+        else:
+            L.append(f"El S&P 500 se movió {spy_pct:+.1f}%; este mes te ganó. "
+                     "Es normal: lo que importa es la década, no el mes.")
+    if cambios_30d:
+        orden = sorted(cambios_30d.items(), key=lambda kv: kv[1], reverse=True)
+        mejor, peor = orden[0], orden[-1]
+        L.append(f"Tu estrella fue **{mejor[0]}** ({mejor[1]:+.1f}%); "
+                 f"la que más pesó, **{peor[0]}** ({peor[1]:+.1f}%). "
+                 "Tener ambas en el mismo barco se llama diversificación: "
+                 "por eso tu mes no depende de una sola carta.")
+    if depositos > 0:
+        L.append(f"Aportaste **${depositos:,.0f}** este mes. Cada aportación "
+                 "compra tu libertad futura — el hábito le gana al timing.")
+    if hubo_caida and n_ventas == 0:
+        L.append("Hubo una caída en el camino y **no vendiste**. Esa decisión "
+                 "silenciosa suele ser la más rentable del mes. 💎")
+    elif n_ventas > 0 and hubo_caida:
+        L.append("Vendiste durante una caída. A veces es necesario — pero si "
+                 "fue por miedo, platícalo con tu asesor antes de la próxima.")
+    if n_compras > 0:
+        L.append(f"Hiciste {n_compras} compra{'s' if n_compras > 1 else ''} "
+                 "nueva{}.".format("s" if n_compras > 1 else ""))
+    if meta:
+        avance = saldo / meta["monto_meta"] if meta.get("monto_meta") else 0
+        L.append(f"**{meta['nombre']}** va en **{avance:.0%}**. "
+                 "Paso a paso — así se llega.")
+    L.append("")
+    L.append("> Informativo y educativo; no constituye asesoría de inversión.")
+    return "\n\n".join(L)

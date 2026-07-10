@@ -29,9 +29,35 @@ def logo_svg(width: int = 190, con_texto: bool = True,
 </svg>"""
 
 
+import base64
+import functools
+import os
+
+_MIME = {".png": "png", ".jpg": "jpeg", ".jpeg": "jpeg", ".webp": "webp"}
+
+
+@functools.lru_cache(maxsize=1)
+def _logo_file_b64() -> tuple[str, str] | None:
+    """(mime, base64) del logo oficial en assets/, si existe."""
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    for ext, mime in _MIME.items():
+        ruta = os.path.join(root, "assets", f"logo{ext}")
+        if os.path.exists(ruta):
+            with open(ruta, "rb") as fh:
+                return mime, base64.b64encode(fh.read()).decode()
+    return None
+
+
 def logo_html(width: int = 190, centrado: bool = True,
               con_texto: bool = True, color_texto: str = MEDIANOCHE) -> str:
-    svg = logo_svg(width, con_texto, color_texto)
+    """Logo oficial (assets/logo.png) si existe; monograma SVG si no."""
+    archivo = _logo_file_b64()
+    if archivo:
+        mime, b64 = archivo
+        pieza = (f"<img src='data:image/{mime};base64,{b64}' width='{width}' "
+                 f"alt='AL-X Capital' style='border-radius:10px'/>")
+    else:
+        pieza = logo_svg(width, con_texto, color_texto)
     if centrado:
-        return f"<div style='text-align:center'>{svg}</div>"
-    return svg
+        return f"<div style='text-align:center'>{pieza}</div>"
+    return pieza

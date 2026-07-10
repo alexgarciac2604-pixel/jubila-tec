@@ -1,0 +1,6 @@
+Coloca aquí el logo oficial como:  logo.png
+(idealmente con fondo transparente; también sirve .jpg o .webp)
+
+La app lo detecta sola: login del Portal, encabezado del cliente y
+barra lateral del Studio. Si no existe el archivo, usa el monograma
+SVG de respaldo.

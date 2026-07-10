@@ -24,7 +24,7 @@ jobs:
           from src.screener.deepscan import run_full, sp500_universe
           uni = sp500_universe()
           print(f"universo: {len(uni)} tickers")
-          st = run_full(uni)
+          st = run_full(uni, force=True)
           print(f"analizadas: {len(st['done'])}/{st['universe_n']}")
           etiquetas = {}
           for r in st["done"].values():
@@ -39,5 +39,4 @@ jobs:
           git config user.name "jubilatec-bot"
           git config user.email "bot@al-x.local"
           git add -A data/
-          git diff --cached --quiet || git commit -m "chore: deep scan $(date -u +%F)"
-          git push
+          git diff --cached --quiet || git commit -m "chore: deep

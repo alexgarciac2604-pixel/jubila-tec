@@ -183,11 +183,12 @@ def save_state(st: dict) -> None:
         json.dump(st, fh, ensure_ascii=False)
 
 
-def start_or_resume(universe: list[str] | None = None) -> dict:
-    """Prepara el estado: si el escaneo es de hoy, lo retoma; si no, reinicia."""
+def start_or_resume(universe: list[str] | None = None,
+                    force: bool = False) -> dict:
+    """Prepara el estado: hoy se retoma; force=True reinicia SIEMPRE."""
     st = load_state()
     hoy = str(date.today())
-    if st.get("date") != hoy or not (st.get("pending") or st.get("done")):
+    if force or st.get("date") != hoy or not (st.get("pending") or st.get("done")):
         uni = universe or sp500_universe()
         st = {"date": hoy, "done": {}, "pending": list(uni),
               "universe_n": len(uni)}
@@ -212,9 +213,9 @@ def run_block(block: int = 20, analyze_fn=None) -> dict:
 
 
 def run_full(universe: list[str] | None = None, block: int = 25,
-             analyze_fn=None, log=print) -> dict:
-    """Corre TODO por bloques (para el job nocturno/semanal)."""
-    st = start_or_resume(universe)
+             analyze_fn=None, log=print, force: bool = False) -> dict:
+    """Corre TODO por bloques (job semanal). force=True regenera desde cero."""
+    st = start_or_resume(universe, force=force)
     while st["pending"]:
         st = run_block(block, analyze_fn)
         log(f"deepscan: {len(st['done'])}/{st['universe_n']}")

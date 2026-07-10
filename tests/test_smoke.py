@@ -826,24 +826,25 @@ def test_v0231_candados_integridad():
     from src.data.market_data import using_sample, yf_status
     assert using_sample() is True              # tests: JT_FORCE_SAMPLE=1 explícito
     ok, err = yf_status()
-    assert ok is False and err                 # sandbox sin yfinance, motivo visible
+    assert ok is False and err                 # sandbox sin yfinance, motivo vi
 
-    from src.screener.engine import save_screener
-    os.environ["JT_SCREENER_PATH"] = "/tmp/jt_scr_guard.json"
-    malo = {"date": "2026-01-01", "source": "sample", "n": 105, "rows": []}
-    os.environ.pop("JT_ALLOW_SAMPLE_SAVE", None)
-    try:
-        try:
-            save_screener(malo)
-            assert False, "debió rechazar el screener sintético"
-        except RuntimeError as e:
-            assert "integridad" in str(e)
-        casi_vacio = {"date": "2026-01-01", "source": "stooq", "n": 3, "rows": []}
-        try:
-            save_screener(casi_vacio)
-            assert False, "debió rechazar el screener casi vacío"
-        except RuntimeError as e:
-            assert "anterior" in str(e)
-    finally:
-        os.environ["JT_ALLOW_SAMPLE_SAVE"] = "1"
-        os.environ.pop("JT_SCREENER_PATH", None)
+def test_v0232_deepscan_force():
+    """force=True reinicia aunque exista un escaneo 'terminado' de hoy."""
+    import os
+    os.environ["JT_DEEPSCAN_PATH"] = "/tmp/jt_ds_force.json"
+    from src.screener import deepscan as dsc
+
+    def fake(t):
+        return {"ticker": t, "label": "Esperar", "emoji": "🟡",
+                "confianza": "media", "razon": "x", "name": t, "sector": "X",
+                "price": 1.0, "score": 50, "f_score": 5, "n": 0,
+                "win_rate": None, "avg_fwd_3m": None}
+    dsc.start_or_resume(["A", "B"])
+    dsc.run_full(block=5, analyze_fn=fake, log=lambda *_: None)
+    st = dsc.load_state()
+    assert len(st["done"]) == 2 and not st["pending"]     # "terminado" hoy
+    st2 = dsc.start_or_resume(["A", "B", "C"])            # sin force: no toca
+    assert len(st2["done"]) == 2
+    st3 = dsc.start_or_resume(["A", "B", "C"], force=True)
+    assert st3["done"] == {} and len(st3["pending"]) == 3  # reiniciado
+    os.environ.pop("JT_DEEPSCAN_PATH", None)

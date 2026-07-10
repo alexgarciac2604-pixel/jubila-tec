@@ -697,3 +697,31 @@ def test_v020_narrativa_y_cristal():
     price_at, px_now, monto = 100.0, 80.0, 4_000.0
     cristaliza = monto - (monto / px_now) * price_at   # vendo $4k a -20%
     assert abs(cristaliza - (-1_000.0)) < 0.01          # pierdo $1,000 real
+
+
+def test_v021_capa_para_todos():
+    """Explicadores de 3 niveles: correctos en números y en tono."""
+    from src.report import plain
+
+    assert len(plain.GLOSARIO) >= 12
+    assert all(len(v) > 40 for v in plain.GLOSARIO.values())  # nada telegráfico
+
+    e = plain.explica_score("KO", {"score": 78, "calidad": 85,
+                                   "tecnico": 70, "valoracion": 75},
+                            "2026-07-09")
+    assert "🧒" in e and "📚" in e and "🔬" in e            # los 3 niveles
+    assert "78 de 100" in e and "tiendita" in e
+    assert "85×0.35" in e and "2026-07-09" in e             # auditable
+    assert abs(85 * .35 + 70 * .35 + 75 * .30 - 76.75) < 0.01
+
+    r = plain.explica_riesgo(22.0, 1.3, -35.0)
+    assert "±22%" in r and "1.30" in r and "35%" in r
+    assert "baches" in r and "√252" in r                    # niño Y doctor
+
+    m = plain.explica_mc(80_000, 150_000, 260_000, 0.18)
+    assert "800" in m and "$150,000" in m and "18" in m
+
+    d = plain.explica_reverse_dcf("NVDA", 0.30)
+    assert "30%" in d and "promesa" in d and "9%" in d
+    d2 = plain.explica_reverse_dcf("KO", 0.05)
+    assert "sorpresa es a tu favor" in d2

@@ -443,14 +443,22 @@ def _client_panel(client: dict) -> None:
                           fmt_pct(stats["max_drawdown"] * 100),
                           help="La peor caída desde un máximo. Lo que habrías "
                                "aguantado en el peor momento.")
+                with st.expander("🧒 ¿Qué significan estos tres números?"):
+                    from src.report.plain import explica_riesgo
+                    st.markdown(explica_riesgo(stats["ann_vol"] * 100,
+                                               stats["sharpe"],
+                                               stats["max_drawdown"] * 100))
                 mc = monte_carlo_paths(stats["ann_return"], stats["ann_vol"],
                                        years=5, n_paths=800, start=total_now)
-                st.caption(
-                    f"**Proyección a 5 años (Monte Carlo, colas gordas):** mediano "
-                    f"{fmt_money(mc['p50'])}, pesimista (P10) {fmt_money(mc['p10'])}, "
-                    f"optimista (P90) {fmt_money(mc['p90'])}. Prob. de terminar "
-                    f"debajo del valor actual: {mc['prob_loss']:.0%}."
-                )
+                st.markdown(
+                    f"**🔮 Proyección a 5 años:** escenario del medio "
+                    f"{fmt_money(mc['p50'])} · malo (P10) {fmt_money(mc['p10'])} "
+                    f"· bueno (P90) {fmt_money(mc['p90'])}.")
+                with st.expander("🧒 ¿Cómo adivinamos el futuro? (no lo "
+                                 "adivinamos)"):
+                    from src.report.plain import explica_mc
+                    st.markdown(explica_mc(mc["p10"], mc["p50"], mc["p90"],
+                                           mc["prob_loss"]))
                 st.markdown("**🧨 ¿Y si el mercado se estresa?**")
                 st.dataframe(portfolio_stress(tickers, w_now), hide_index=True,
                              use_container_width=True)
@@ -591,16 +599,12 @@ def _client_panel(client: dict) -> None:
             f"<b>{titular}</b>: {razon}{pilares}{mercado}</div>",
             unsafe_allow_html=True)
 
-        with st.expander("🔮 Caja de Cristal — revisa nuestra matemática"):
+        with st.expander("🔮 Caja de Cristal — que cualquiera lo entienda, "
+                         "que cualquiera lo audite"):
+            from src.report.plain import explica_reverse_dcf, explica_score
             if row:
-                st.markdown(
-                    f"**Score de screening** = Calidad×35% + Técnico×35% + "
-                    f"Valoración×30% = {row.get('calidad', 0)}×.35 + "
-                    f"{row.get('tecnico', 0)}×.35 + {row.get('valoracion', 0)}"
-                    f"×.30 ≈ **{row.get('score', '—')}/100**")
-                st.caption("Calidad: ROE, márgenes, deuda y caja · Técnico: "
-                           "tendencia, RSI, momentum · Valoración: earnings "
-                           "yield vs. su sector. Sin cajas negras.")
+                st.markdown(explica_score(tk, row,
+                                          scr.get("date", "") if scr else ""))
             try:
                 from src.data.market_data import get_fundamentals, source_of
                 fnd = get_fundamentals(tk)
@@ -611,20 +615,7 @@ def _client_panel(client: dict) -> None:
                     from src.valuation.dcf import reverse_dcf
                     g = reverse_dcf(mc, fcf, 0.09, net_debt=nd)
                     if g is not None:
-                        if g > 0.25:
-                            juicio = ("una promesa **muy exigente** — pocas "
-                                      "empresas en la historia lo han sostenido")
-                        elif g > 0.10:
-                            juicio = ("optimista pero posible para un buen "
-                                      "negocio")
-                        else:
-                            juicio = ("una vara baja: si lo supera, la "
-                                      "sorpresa es a tu favor")
-                        st.markdown(
-                            f"**🎯 Qué promete el precio:** para justificar su "
-                            f"valor actual, {tk} necesita crecer su flujo de "
-                            f"caja **~{g:.0%} anual durante 5 años** "
-                            f"(WACC 9%). Eso es {juicio}. ¿Tú lo crees?")
+                        st.markdown(explica_reverse_dcf(tk, g))
                 st.caption(f"Fuente de precios: {source_of(tk)} · "
                            "Fundamentales: SEC EDGAR/yfinance · Modelos "
                            "documentados en 📚 Modelos del Studio.")
@@ -879,6 +870,12 @@ def _client_panel(client: dict) -> None:
             st.caption("Screening cuantitativo educativo (calidad + técnico + "
                        "valoración). No es una orden de compra: coméntalo con "
                        "tu asesor.")
+
+        with st.expander("📚 Diccionario del inversionista — sin palabras "
+                         "raras"):
+            from src.report.plain import GLOSARIO
+            for term, deff in GLOSARIO.items():
+                st.markdown(f"**{term}** — {deff}")
 
         if holdings:
             st.markdown("**📰 Noticias de tus empresas**")

@@ -30,13 +30,12 @@ jobs:
           for r in st["done"].values():
               etiquetas[r["label"]] = etiquetas.get(r["label"], 0) + 1
           print("etiquetas:", etiquetas)
-          assert len(st["done"]) >= 30, (
-              "Deep Scan casi vacío: fuentes de datos caídas o bloqueadas — "
-              "el job debe fallar, no fingir éxito")
+          assert len(st["done"]) >= 30, "Deep Scan casi vacio: fuentes caidas"
           PY
       - name: Commit resultados
         run: |
           git config user.name "jubilatec-bot"
           git config user.email "bot@al-x.local"
           git add -A data/
-          git diff --cached --quiet || git commit -m "chore: deep
+          git diff --cached --quiet || git commit -m "chore: deep scan semanal"
+          git push

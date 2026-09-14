@@ -14,7 +14,10 @@ jobs:
         with:
           python-version: "3.12"
       - name: Instalar dependencias del núcleo
-        run: pip install numpy pandas scipy scikit-learn
+        # requests: lo usa dbx (Turso HTTP) y lo mockean varios tests.
+        # NOTA: yfinance NO se instala a propósito — test_v0231 verifica que
+        # su ausencia NO autorice datos sintéticos (candado de integridad).
+        run: pip install numpy pandas scipy scikit-learn requests
       - name: Smoke tests (modo offline determinista)
         env:
           JT_FORCE_SAMPLE: "1"

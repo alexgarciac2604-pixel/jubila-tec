@@ -1,5 +1,15 @@
 # 🧭 AL-X — Plan Maestro de Producto
 
+> **v0.24.0 (2026-09-14):** Arranca la ruta "Nivel 2" (ver `PROPUESTAS_NIVEL2.md`).
+> Entregado: **(A2)** arnés anti-alucinación del copiloto — `test_nivel2_copilot_no_alucina`
+> verifica que en modo plantilla ninguna cifra ($/%/x100) salga fuera del contexto de los
+> motores (guardián previo al copiloto agéntico A1). **Bug de CI corregido:** el runner de
+> `tests/test_smoke.py` estaba a media página y ocultaba **13/42 tests** a `python
+> tests/test_smoke.py` (incluidos los candados de integridad); ahora corre al final → los
+> **43** se ejecutan en CI. *(B2 briefing-por-cliente y B4 estado narrativo ya existían
+> desde v0.11/v0.20.)*
+
+
 > **v0.12**: la plataforma se renombró de Jubila-Tec a **AL-X**. Arquitectura de
 > dos apps del mismo repo: `app.py` = **AL-X Studio** (asesor) y `cliente.py` =
 > **AL-X Portal de Clientes** (standalone, sin terminal). ⚠️ Pendiente crítico:

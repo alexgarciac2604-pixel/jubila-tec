@@ -406,14 +406,6 @@ def test_v011_clients():
     cm.delete_client("C-001")
 
 
-if __name__ == "__main__":
-    fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
-    for fn in fns:
-        fn()
-        print(f"  ok {fn.__name__}")
-    print("All smoke tests passed.")
-
-
 def test_dbx_dual_layer():
     """Capa dual: codificación Hrana simétrica + routing a Turso con secrets."""
     from unittest.mock import patch
@@ -848,3 +840,47 @@ def test_v0232_deepscan_force():
     st3 = dsc.start_or_resume(["A", "B", "C"], force=True)
     assert st3["done"] == {} and len(st3["pending"]) == 3  # reiniciado
     os.environ.pop("JT_DEEPSCAN_PATH", None)
+
+
+def test_nivel2_copilot_no_alucina():
+    """A2 — arnés anti-alucinación del copiloto: en modo plantilla, NINGUNA
+    cifra ($ / % / x/100) de la respuesta puede faltar del contexto que arman
+    los motores. Es el guardián que blinda al copiloto antes de darle
+    herramientas (copiloto agéntico, A1)."""
+    import re
+    from src.copilot.copilot import _rule_based, build_context, detect_intent
+
+    def cifras(texto: str) -> set:
+        t = set()
+        t |= set(re.findall(r"\$[\d,]+(?:\.\d+)?", texto))     # $1,234.56
+        t |= set(re.findall(r"[+-]?\d+(?:\.\d+)?%", texto))    # +12%, -2.3%
+        t |= set(re.findall(r"\b\d+/100\b", texto))            # 84/100
+        return t
+
+    for q in ("¿Qué te parece apple?", "como ves AAPL hoy?",
+              "analiza tesla por favor"):
+        intent = detect_intent(q)
+        assert intent["kind"] == "ticker"
+        ctx = build_context(intent)
+        resp = _rule_based(intent, ctx)
+        inventadas = cifras(resp) - cifras(ctx)
+        assert not inventadas, f"{q}: cifras sin respaldo en motores → {inventadas}"
+        low = resp.lower()
+        assert "educativo" in low or "asesoría" in low or "asesoria" in low
+        assert _rule_based(intent, ctx) == resp                 # determinista
+
+    # mercado: respuesta = contexto + sufijo → no aparecen cifras nuevas
+    im = detect_intent("¿cómo está el mercado hoy?")
+    cm_ctx = build_context(im)
+    assert cifras(_rule_based(im, cm_ctx)) - cifras(cm_ctx) == set()
+
+    # saludo: no emite cifras de datos
+    assert cifras(_rule_based(detect_intent("hola"), "")) == set()
+
+
+if __name__ == "__main__":
+    fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
+    for fn in fns:
+        fn()
+        print(f"  ok {fn.__name__}")
+    print(f"All smoke tests passed ({len(fns)}).")

@@ -636,42 +636,50 @@ def _client_panel(client: dict) -> None:
             hpos = next((h for h in holdings if h["ticker"] == tk), None)
             if hpos:
                 try:
+                    from src.advisor.coaching import panic_check
                     _pxv = get_quote(tk)["price"]
                     _inv = hpos.get("invested") or capital * hpos["weight"]
                     _units = _inv / hpos["price_at"] if hpos["price_at"] else 0
                     _val = _units * _pxv
-                    _rend = (_val / _inv - 1) * 100 if _inv else 0
-                    if _rend < -2:
-                        _m = min(monto if "inv_monto" in st.session_state
-                                 else 5_000.0, _val)
-                        _cristaliza = _m - (_m / _pxv) * hpos["price_at"]
-                        turb = ""
-                        try:
-                            from src.models.regime import market_regime
-                            _reg = market_regime()
-                            if _reg.get("p_turbulent", 0) > 0.5:
-                                turb = (" Además el mercado está en plena "
-                                        "turbulencia: vender en pánico durante "
-                                        "la tormenta es, históricamente, la "
-                                        "forma #1 de perder dinero.")
-                        except Exception:
-                            pass
+                    _m = min(monto if "inv_monto" in st.session_state
+                             else 5_000.0, _val)
+                    _turb = False
+                    try:
+                        from src.models.regime import market_regime
+                        _turb = market_regime().get("p_turbulent", 0) > 0.5
+                    except Exception:
+                        pass
+                    iv = panic_check(hpos["price_at"], _pxv, _m, _turb)
+                    if iv:
+                        st.session_state["_panic_pending"] = {
+                            "ticker": tk, "cristalizado": iv["cristalizado"],
+                            "turbulento": iv["turbulento"]}
+                        turb = (" Además el mercado está en plena turbulencia: "
+                                "vender en pánico durante la tormenta es, "
+                                "históricamente, la forma #1 de perder dinero."
+                                ) if iv["turbulento"] else ""
                         st.markdown(
                             f"<div class='alx-note' style='border-left-color:"
                             f"#B42318'>🧘 <b>Un momento — respira.</b><br>"
-                            f"{tk} va {_rend:+.1f}% desde tu compra. Vender "
-                            f"ahora <b>convierte en definitiva una pérdida de "
-                            f"~${abs(_cristaliza):,.0f}</b> que hoy solo está "
-                            f"en papel.{turb} Los mercados se han recuperado "
-                            f"de cada crisis de su historia — la pregunta no "
-                            f"es si duele hoy, sino si la empresa sigue "
-                            f"siendo buena.</div>",
+                            f"{tk} va {iv['rend_pct']:+.1f}% desde tu compra. "
+                            f"Vender ahora <b>convierte en definitiva una "
+                            f"pérdida de ~${abs(iv['cristalizado']):,.0f}</b> "
+                            f"que hoy solo está en papel.{turb} Los mercados se "
+                            f"han recuperado de cada crisis de su historia — la "
+                            f"pregunta no es si duele hoy, sino si la empresa "
+                            f"sigue siendo buena.</div>",
                             unsafe_allow_html=True)
                         adelante = st.checkbox(
                             "Lo pensé con calma (no es pánico) y decido vender.")
                         if st.button("✉️ Mejor lo hablo con mi asesor"):
+                            from src.clients.manager import log_panic_event
+                            log_panic_event(client["id"], tk, iv["cristalizado"],
+                                            iv["turbulento"], "consulto_asesor")
+                            st.session_state.pop("_panic_pending", None)
                             st.session_state["alx_goto"] = True
                             st.rerun()
+                    else:
+                        st.session_state.pop("_panic_pending", None)
                 except Exception:
                     pass
         if st.button(f"⚡ Ejecutar {side} ahora", type="primary",
@@ -681,6 +689,11 @@ def _client_panel(client: dict) -> None:
             ok, msg = execute_order(client["id"], side, tk, monto, nota)
             (st.success if ok else st.error)(msg)
             if ok:
+                _pend = st.session_state.pop("_panic_pending", None)
+                if side == "venta" and _pend and _pend.get("ticker") == tk:
+                    from src.clients.manager import log_panic_event
+                    log_panic_event(client["id"], tk, _pend["cristalizado"],
+                                    _pend["turbulento"], "vendio")
                 st.rerun()
         st.caption(f"💵 Efectivo disponible: {fmt_money(efectivo)}. "
                    "⚖️ Registro informativo: la app no custodia dinero ni valores.")

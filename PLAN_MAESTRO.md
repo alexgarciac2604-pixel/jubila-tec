@@ -1,5 +1,13 @@
 # 🧭 AL-X — Plan Maestro de Producto
 
+> **v0.26.0 (2026-09-15):** **(B3) Copiloto anti-pánico medible** — la
+> intervención al vender en pérdida ahora es una función pura testeada
+> (`src/advisor/coaching.py::panic_check`, cristalización auditable) y **se
+> registra**: nueva tabla `panic_log`, `manager.log_panic_event/panic_events/
+> panic_stats`. La Mesa del Asesor muestra "🧘 Coaching anti-pánico": frenos
+> mostrados, cuántos prefirieron consultar, y **$ de pérdida evitada**. Es el
+> arma emocional única del mercado, ahora demostrable. Tests: `test_nivel2_anti_panico` (46/46).
+
 > **v0.25.0 (2026-09-15):** **(A1) Copiloto agéntico** — Claude orquesta los
 > motores como *herramientas* (`src/copilot/tools.py`: `analizar_accion`,
 > `comparar_acciones`, `estado_mercado` + `dispatch`), bucle tool-use en

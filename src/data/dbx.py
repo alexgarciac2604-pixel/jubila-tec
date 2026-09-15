@@ -53,6 +53,9 @@ _SCHEMA = (
     """CREATE TABLE IF NOT EXISTS client_alerts (
         id TEXT PRIMARY KEY, client_id TEXT, ticker TEXT, cond TEXT,
         umbral REAL, estado TEXT, created TEXT, disparo TEXT)""",
+    """CREATE TABLE IF NOT EXISTS panic_log (
+        id TEXT PRIMARY KEY, client_id TEXT, date TEXT, ticker TEXT,
+        cristalizado REAL, turbulento INTEGER, outcome TEXT)""",
 )
 
 # columnas agregadas después del primer despliegue (fallan si ya existen: ok)

@@ -77,6 +77,7 @@ def delete_client(cid: str) -> None:
         execute_many([
             ("DELETE FROM clients WHERE id=?", (cid.upper(),)),
             ("DELETE FROM holdings WHERE client_id=?", (cid.upper(),)),
+            ("DELETE FROM panic_log WHERE client_id=?", (cid.upper(),)),
         ])
     except Exception:
         pass
@@ -238,6 +239,50 @@ def get_orders(cid: str | None = None) -> list[dict]:
 def reject_order(order_id: str, motivo: str = "") -> None:
     execute("UPDATE orders SET estado=?, nota=? WHERE id=?",
             (f"rechazada", (motivo or "Rechazada por el asesor")[:400], order_id))
+
+
+# ------------------------------------------- B3: bitácora anti-pánico -----
+# outcome ∈ {"consulto_asesor", "retuvo", "vendio"}. Registrar cada vez que la
+# app frena una venta en pérdida deja medible cuánto dinero evitó cristalizar.
+def log_panic_event(cid: str, ticker: str, cristalizado: float,
+                    turbulento: bool, outcome: str) -> None:
+    import uuid
+    execute("INSERT INTO panic_log VALUES (?,?,?,?,?,?,?)",
+            (uuid.uuid4().hex[:12], cid.upper(), str(date.today()),
+             ticker.upper(), float(cristalizado), 1 if turbulento else 0,
+             (outcome or "")[:40]))
+
+
+def panic_events(cid: str | None = None) -> list[dict]:
+    cols = ("id", "client_id", "date", "ticker", "cristalizado",
+            "turbulento", "outcome")
+    sel = ("SELECT id, client_id, date, ticker, cristalizado, turbulento, "
+           "outcome FROM panic_log")
+    try:
+        if cid:
+            rows = query(sel + " WHERE client_id=? ORDER BY date DESC, rowid DESC",
+                         (cid.upper(),))
+        else:
+            rows = query(sel + " ORDER BY date DESC, rowid DESC")
+        return [dict(zip(cols, (r[0], r[1], r[2], r[3], r[4], bool(r[5]), r[6])))
+                for r in rows]
+    except Exception:
+        return []
+
+
+def panic_stats(cid: str | None = None) -> dict:
+    """Resumen para el asesor: cuántas veces frenamos y cuánto dinero se
+    protegió (pérdidas que NO se cristalizaron porque el cliente no vendió)."""
+    ev = panic_events(cid)
+    protegido = sum(abs(e["cristalizado"]) for e in ev
+                    if e["outcome"] in ("consulto_asesor", "retuvo"))
+    return {
+        "intervenciones": len(ev),
+        "consulto_asesor": sum(1 for e in ev if e["outcome"] == "consulto_asesor"),
+        "retuvo": sum(1 for e in ev if e["outcome"] == "retuvo"),
+        "vendio": sum(1 for e in ev if e["outcome"] == "vendio"),
+        "dinero_protegido": round(protegido, 2),
+    }
 
 
 def _holdings_map(cid: str) -> dict[str, dict]:

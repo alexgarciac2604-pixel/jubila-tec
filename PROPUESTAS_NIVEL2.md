@@ -42,8 +42,11 @@ El código (v0.23.1→**0.24.0**) ya rebasó el doc de mercado de julio. Correcc
   ocultaba 13/42 tests al CI.
 - ✅ **A1** (copiloto agéntico) **entregado** en v0.25.0: motores como herramientas +
   bucle tool-use + guardián de números; degrada sin clave. Ya compara dos acciones.
-- ❌ Siguen nuevos: **A3 (RAG citas), B1 (WhatsApp), B3 (intervención anti-pánico),
-  C2 (2FA), C3 (PDF/fiscal), C4 (observabilidad)**.
+- ✅ **B3** (anti-pánico **medible**) **entregado** en v0.26.0: `coaching.panic_check`
+  puro y testeado + bitácora (`panic_log`) + panel del asesor con "$ pérdida evitada".
+  *(La intervención en la UI ya existía; ahora es DRY y medible.)*
+- ❌ Siguen nuevos: **A3 (RAG citas), B1 (WhatsApp), C2 (2FA), C3 (PDF/fiscal),
+  C4 (observabilidad)**.
 
 ---
 

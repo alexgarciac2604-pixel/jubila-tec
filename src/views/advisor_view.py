@@ -106,6 +106,18 @@ def render() -> None:
                "⚖️ Herramienta de análisis para el asesor; no es asesoría "
                "automática al público.")
 
+    from src.clients.manager import panic_stats
+    ps = panic_stats()
+    if ps["intervenciones"]:
+        st.markdown("**🧘 Coaching anti-pánico** (todos tus clientes)")
+        pc1, pc2, pc3 = st.columns(3)
+        pc1.metric("Frenos mostrados", ps["intervenciones"])
+        pc2.metric("Prefirieron hablarte", ps["consulto_asesor"])
+        pc3.metric("💰 Pérdida evitada", f"${ps['dinero_protegido']:,.0f}",
+                   help="Suma de pérdidas que el cliente NO cristalizó porque, "
+                        "en vez de vender en pánico, decidió consultarte.")
+        st.divider()
+
     tk = st.text_input("Analiza una acción", placeholder="AAPL, KO, NVDA…",
                        key="mesa_tk").upper().strip()
     if tk:

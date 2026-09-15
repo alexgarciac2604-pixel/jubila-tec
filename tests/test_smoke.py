@@ -917,6 +917,33 @@ def test_nivel2_guardrail_numeros():
     assert numeros_sin_respaldo("upside 12.34%", hechos) == set()   # redondeo
 
 
+def test_nivel2_anti_panico():
+    """B3 — coaching anti-pánico: cristalización correcta + bitácora medible."""
+    from src.advisor.coaching import panic_check
+    from src.clients import manager as cm
+
+    # matemática: ganancia → no interviene; pérdida → cristaliza (negativo)
+    assert panic_check(100.0, 105.0, 1_000.0, False) is None
+    assert panic_check(100.0, 99.0, 1_000.0, False) is None          # −1% > umbral
+    iv = panic_check(100.0, 80.0, 1_000.0, True)                     # −20%
+    assert iv["rend_pct"] == -20.0 and iv["turbulento"] is True
+    assert round(iv["cristalizado"]) == -250   # $1k a −20%: costo 1250 → pérdida 250
+    assert panic_check(100.0, 80.0, 0.0, True) is None               # sin monto
+
+    # bitácora: registrar outcomes y agregar para el asesor
+    for c in cm.list_clients():
+        cm.delete_client(c["id"])
+    assert cm.create_client("C-PANIC", "Test Pánico", "1234", "moderado", 10_000)
+    cm.log_panic_event("C-PANIC", "AAPL", -200.0, True, "consulto_asesor")
+    cm.log_panic_event("C-PANIC", "AAPL", -150.0, False, "vendio")
+    assert len(cm.panic_events("C-PANIC")) == 2
+    s = cm.panic_stats("C-PANIC")
+    assert s["intervenciones"] == 2 and s["consulto_asesor"] == 1 and s["vendio"] == 1
+    assert s["dinero_protegido"] == 200.0     # solo cuenta lo que NO se vendió
+    cm.delete_client("C-PANIC")
+    assert cm.panic_events("C-PANIC") == []    # delete_client limpia la bitácora
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

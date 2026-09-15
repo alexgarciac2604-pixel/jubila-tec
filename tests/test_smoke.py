@@ -944,6 +944,20 @@ def test_nivel2_anti_panico():
     assert cm.panic_events("C-PANIC") == []    # delete_client limpia la bitácora
 
 
+def test_nivel2_health():
+    """C4 — panel de salud: sondas bien formadas y coherentes con el modo sample."""
+    from src.report.health import system_health
+    h = system_health()
+    assert "version" in h and h["checks"]
+    for c in h["checks"]:
+        assert {"nombre", "estado", "detalle"} <= set(c)
+        assert c["estado"] in {"ok", "warn", "error", "info"}
+    assert h["resumen"] in {"ok", "warn", "error"}
+    # en tests (JT_FORCE_SAMPLE=1) los datos de mercado se marcan sintéticos
+    mkt = next(c for c in h["checks"] if c["nombre"] == "Datos de mercado")
+    assert mkt["estado"] == "warn" and "sintético" in mkt["detalle"]
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

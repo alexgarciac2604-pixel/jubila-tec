@@ -1,5 +1,12 @@
 # 🧭 AL-X — Plan Maestro de Producto
 
+> **v0.27.0 (2026-09-15):** **(C4) Panel de salud / observabilidad** —
+> `src/report/health.py::system_health()` (puro, sondas aisladas) reporta datos
+> de mercado + candado anti-sintético, BD (Turso/SQLite), frescura del screener
+> y deep scan, crecimiento del historial de scores y clientes+anti-pánico. Se ve
+> en **🛰️ Fuentes → "🩺 Salud del sistema"**. La contraparte operativa de la Caja
+> de Cristal ("no nos creas, revísanos"). Test: `test_nivel2_health` (47/47).
+
 > **v0.26.0 (2026-09-15):** **(B3) Copiloto anti-pánico medible** — la
 > intervención al vender en pérdida ahora es una función pura testeada
 > (`src/advisor/coaching.py::panic_check`, cristalización auditable) y **se

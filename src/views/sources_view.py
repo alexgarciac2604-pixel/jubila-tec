@@ -43,6 +43,19 @@ def render() -> None:
             st.error(f"Detalle del error Turso: {msg}")
 
     st.divider()
+    st.subheader("🩺 Salud del sistema")
+    st.caption("Auditabilidad operativa — *no nos creas, revísanos.*")
+    from src.report.health import system_health
+    _h = system_health()
+    _ic = {"ok": "🟢", "warn": "🟡", "error": "🔴", "info": "⚪"}
+    st.markdown(f"Estado general: **{_ic[_h['resumen']]} {_h['resumen'].upper()}** "
+                f"· motor v{_h['version']}")
+    for _c in _h["checks"]:
+        h1, h2 = st.columns([1.6, 3])
+        h1.markdown(f"{_ic.get(_c['estado'], '·')} **{_c['nombre']}**")
+        h2.caption(_c["detalle"])
+
+    st.divider()
     st.markdown(
         "**Degradación elegante:** si una fuente falla o falta la clave, la app usa "
         "el siguiente proveedor o el generador sintético determinista (misma serie "

@@ -39,9 +39,11 @@ El código (v0.23.1→**0.24.0**) ya rebasó el doc de mercado de julio. Correcc
   (v0.11/v0.20). El portal ya muestra "¿Qué pasó con tu dinero?".
 - 🟡 **C1** (canastas del asesor) existe; **falta ligarlas al Deep Scan**.
 - ✅ **A2** (arnés anti-alucinación) **entregado** en v0.24.0 + se corrigió un bug que
-  ocultaba 13/42 tests al CI. Siguiente foco natural: **A1 (copiloto agéntico)**.
-- ❌ Siguen nuevos: **A1, A3, B1 (WhatsApp), B3 (intervención anti-pánico), C2 (2FA),
-  C3 (PDF/fiscal), C4 (observabilidad)**.
+  ocultaba 13/42 tests al CI.
+- ✅ **A1** (copiloto agéntico) **entregado** en v0.25.0: motores como herramientas +
+  bucle tool-use + guardián de números; degrada sin clave. Ya compara dos acciones.
+- ❌ Siguen nuevos: **A3 (RAG citas), B1 (WhatsApp), B3 (intervención anti-pánico),
+  C2 (2FA), C3 (PDF/fiscal), C4 (observabilidad)**.
 
 ---
 

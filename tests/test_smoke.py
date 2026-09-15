@@ -878,6 +878,45 @@ def test_nivel2_copilot_no_alucina():
     assert cifras(_rule_based(detect_intent("hola"), "")) == set()
 
 
+def test_nivel2_copilot_tools():
+    """A1 — herramientas del copiloto agéntico: cada motor expuesto como tool
+    devuelve hechos numéricos coherentes y el dispatcher es robusto."""
+    from src.copilot.tools import (TOOL_SPECS, analizar_accion,
+                                    comparar_acciones, dispatch, estado_mercado)
+
+    h = analizar_accion("AAPL")
+    assert 0 <= h["score"] <= 100 and h["precio"] > 0
+    assert set(h["pilares"]) == {"fundamental", "valuation", "technical",
+                                 "forensic", "sentiment"}
+    assert isinstance(h["piotroski_f"], (int, float))
+
+    c = comparar_acciones("AAPL", "MSFT")
+    assert {"a", "b", "diferencias"} <= set(c)
+    assert c["diferencias"]["score"] == c["a"]["score"] - c["b"]["score"]
+
+    m = estado_mercado()
+    assert "regimen" in m and 0 <= m["prob_turbulencia_pct"] <= 100
+
+    # dispatcher: nombre válido, y errores como dato (no excepción)
+    assert dispatch("analizar_accion", {"ticker": "AAPL"})["score"] == h["score"]
+    assert "error" in dispatch("herramienta_fantasma", {})
+    assert "error" in dispatch("analizar_accion", {})     # falta arg → error
+
+    for spec in TOOL_SPECS:                                # esquema bien formado
+        assert {"name", "description", "input_schema"} <= set(spec)
+        assert spec["input_schema"]["type"] == "object"
+
+
+def test_nivel2_guardrail_numeros():
+    """A2 extendido — el guardián detecta cifras sin respaldo en los hechos."""
+    from src.copilot.guard import numeros_sin_respaldo
+    hechos = {"score": 84, "precio": 190.5, "upside_pct": 12.3}
+    assert numeros_sin_respaldo(
+        "Score 84/100, cotiza a $190.50 con upside de 12.3%.", hechos) == set()
+    assert "999" in numeros_sin_respaldo("El valor justo es $999.", hechos)
+    assert numeros_sin_respaldo("upside 12.34%", hechos) == set()   # redondeo
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

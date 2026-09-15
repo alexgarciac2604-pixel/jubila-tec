@@ -1,5 +1,16 @@
 # 🧭 AL-X — Plan Maestro de Producto
 
+> **v0.25.0 (2026-09-15):** **(A1) Copiloto agéntico** — Claude orquesta los
+> motores como *herramientas* (`src/copilot/tools.py`: `analizar_accion`,
+> `comparar_acciones`, `estado_mercado` + `dispatch`), bucle tool-use en
+> `src/copilot/agent.py`, y guardián de números en `src/copilot/guard.py`. Ya
+> responde preguntas compuestas (comparar dos acciones). Regla de oro intacta:
+> **orquesta, nunca calcula.** Cableado en `copilot.answer()`: con
+> `ANTHROPIC_API_KEY` es el camino primario; sin clave degrada al copiloto
+> clásico (plantillas). Tests offline: `test_nivel2_copilot_tools` +
+> `test_nivel2_guardrail_numeros` (45/45). *El modo agéntico live necesita la
+> clave; el resto se prueba determinista sin ella.*
+
 > **v0.24.0 (2026-09-14):** Arranca la ruta "Nivel 2" (ver `PROPUESTAS_NIVEL2.md`).
 > Entregado: **(A2)** arnés anti-alucinación del copiloto — `test_nivel2_copilot_no_alucina`
 > verifica que en modo plantilla ninguna cifra ($/%/x100) salga fuera del contexto de los

@@ -226,6 +226,18 @@ def llm_available() -> bool:
 
 
 def answer(question: str) -> dict:
+    # A1 — camino agéntico: si hay clave, Claude orquesta las herramientas
+    # (los motores). Cualquier fallo degrada al camino clásico de abajo.
+    if get_secret("ANTHROPIC_API_KEY"):
+        try:
+            from src.copilot.agent import agent_answer
+            ag = agent_answer(question)
+            if ag and ag.get("text", "").strip():
+                ag["intent"] = "agente"
+                return ag
+        except Exception:
+            pass
+
     intent = detect_intent(question)
     if intent["kind"] == "unknown_ticker":
         from src.data.market_data import lookup_ticker
